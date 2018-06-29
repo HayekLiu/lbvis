@@ -6,9 +6,12 @@
       </div>
     </nav>
     <div id="content">
-      <myRank id="rank-container"></myRank>
+      <!-- <myRank id="rank-container"></myRank> -->
+      <myOverall id="overview-container"></myOverall>
       <myGlyph id="glyph-container"></myGlyph>
       <myGraph id="load-balance-container"></myGraph>
+      <mySimilar id="similarity-container"></mySimilar>
+      <mySpatial id="spatial-container"></mySpatial>
     </div>
   </div>
 </template>
@@ -16,15 +19,18 @@
 import '../node_modules/bootstrap/dist/css/bootstrap.css'
 import '../node_modules/bootstrap-vue/dist/bootstrap-vue.css'
 import BootstrapVue from 'bootstrap-vue'
+import myOverall from './components/overview.vue'
 import myGraph from './components/graph.vue'
-import myRank from './components/rank.vue'
+//import myRank from './components/rank.vue'
 import myGlyph from './components/glyph.vue'
+import mySimilar from './components/similarity.vue'
+import mySpatial from './components/spatial.vue'
 import $ from 'jquery'
 import { mapActions, mapGetters } from 'vuex'
 import axios from 'axios'
 export default {
   name: 'app',
-  components: { myGraph, myRank, myGlyph },
+  components: { myOverall, myGlyph, myGraph, mySimilar, mySpatial },
   methods: {
     ...mapActions(['setGraphData', 'setSelectRound']),
   },
@@ -46,24 +52,33 @@ export default {
           sendUrl ('ws', formData, 'test')
         }
 
-       
-       
         function sendUrl (Url, formData, v_id){
-          Url='http://127.0.0.1:22068/'+Url
+          Url='http://127.0.0.1:22068/'+Url // 发送消息字符
           console.log('Request: ', Url)
-          self.$api.post(Url,formData, d => {
+          self.$api.post(Url,formData, d => { // 接收到返回值
             console.log('success: ', d)
             
           })
         }
         
-    var max_round = 15, n_nodes = 64 
+    var max_round = 15, n_nodes = 32 
 
     //var min_workload, max_worload;
+    var balances = [];
     var nodes = [], max_nodes = [], links = [], dists = [], transfers = []
     //var transfer_json = {}, dist_json = {};
 
-    var dir = "static/resource/data"+n_nodes+"_2/"
+    var dir = "static/resource/data"+n_nodes+"_2_full/"
+
+  d3.csv(dir + "balance.csv", function (error, data_b) {
+    if (error) throw error;
+
+    data_b.forEach(function (d, i) {
+      // if (i < max_round) 
+      {
+        balances.push({"x": +d.time, "y": +d.balance});
+      }
+    });
 
     d3.csv(dir + "block_dist.csv", function (error, data_d1) {
       if (error) throw error;
@@ -213,7 +228,9 @@ export default {
                 }
               });
 
-              self.setGraphData({'nodes': nodes, 
+              self.setGraphData({
+                                 'balances': balances,
+                                 'nodes': nodes, 
                                  'max_nodes': max_nodes,
                                  'links': links, 
                                  'dists': dists,
@@ -224,7 +241,7 @@ export default {
           });
       });
     });
-
+  });
   }
 }
 
@@ -255,28 +272,45 @@ export default {
     border-left: 2px solid grey;
     border-right: 2px solid grey;
     border-bottom: 2px solid grey;
-    #rank-container {
+    #overview-container {
       position: absolute;
       top: 0;
       left: 0;
-      width: 12%;
-      height: 100%;
+      width: 75%;
+      height: 15%;
       border: 1px solid grey;
     }
     #glyph-container {
       position: absolute;
-      top: 0;
-      left: 12%;
-      width: 8%;
-      height: 100%;
-      border: 1px solid grey;
+      top: 15%;
+      left: 0%;
+      width: 5%;
+      height: 85%;
+      border: 0px solid grey;
     }
     #load-balance-container {
       position: absolute;
+      top: 15%;
+      left: 5%;
+      width: 70%;
+      height: 85%;
+      border: 1px solid grey;
+    }
+    #similarity-container {
+      position: absolute;
       top: 0;
-      left: 20%;
-      width: 80%;
-      height: 100%;
+      left: 75%;
+      width: 25%;
+      height: 50%;
+      border: 1px solid grey;
+    }
+    #spatial-container {
+      position: absolute;
+      top: 50%;
+      left: 75%;
+      width: 25%;
+      height: 50%;
+      border: 1px solid grey;
     }
   }
 }

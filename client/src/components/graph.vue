@@ -183,7 +183,7 @@ export default {
         .y(function (d) { return d[1] });
 
       self.max_round = 15
-      self.n_nodes = 64
+      self.n_nodes = 32
       self.n_limited_nodes = 32
       if (self.n_nodes > self.n_limited_nodes) self.n_display_nodes = self.n_limited_nodes + 1;
       else self.n_display_nodes = self.n_limited_nodes

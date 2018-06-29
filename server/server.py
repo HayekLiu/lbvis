@@ -23,7 +23,7 @@ client_file_root_path = os.path.abspath(client_file_root_path)
 print('Init data manager');
 
 def queryDatabase(databaseName):
-  db = client['vastchallenge2017mc1']
+  db = client['lbvis']
   collection = db[databaseName]
   cur = collection.find({})
 
@@ -34,14 +34,14 @@ def queryDatabase(databaseName):
   return result
 
 def writeDatabase(databaseName,data):
-  db = client['vastchallenge2017mc1']
+  db = client['lbvis'] # 数据库名，首先要新建一个数据库
   collection = db[databaseName]
   for index in data:
     del index["deleted"]
     del index["new"]
   cur = collection.insert_many(data)
 
-class wsHandler(tornado.web.RequestHandler):
+class wsHandler(tornado.web.RequestHandler): # 处理消息
     def post(self):
       self.set_header('Access-Control-Allow-Origin','*')  # 添加响应头，允许指定域名的跨域请求
       self.set_header("Access-Control-Allow-Headers", "X-Requested-With");  
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     print('server running at 127.0.0.1:%d ...'%(tornado.options.options.port))
     print(client_file_root_path)
     app = tornado.web.Application(
-        handlers=[
+        handlers=[ # 字符匹配，处理消息，跟libmviews一样的机制
                   (r'/ws', wsHandler),
                   (r'/checkClassName', checkClassNameHandler),
                   # (r'/queryCarList', queryCarListHandler),
