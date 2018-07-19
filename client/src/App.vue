@@ -32,7 +32,7 @@ export default {
   name: 'app',
   components: { myOverall, myGlyph, myGraph, mySimilar, mySpatial },
   methods: {
-    ...mapActions(['setGraphData', 'setSelectRound']),
+    ...mapActions(['setGraphData', 'setSelectRound', 'setSelectRoundIndex']),
   },
   async created() {
     // axios.get("../static/resource/data32_2/block_transfer.csv").then(response => {  

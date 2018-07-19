@@ -1,2 +1,3 @@
 export const GRAPH_DATA = 'GRAPH_DATA';
 export const SELECT_ROUND = 'SELECT_ROUND';
+export const SELECT_ROUND_INDEX = 'SELECT_ROUND_INDEX';

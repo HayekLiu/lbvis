@@ -8,6 +8,10 @@ export default {
     console.log(selectRound)
     commit(types.SELECT_ROUND, selectRound)
   },
+  setSelectRoundIndex({ commit, state }, selectRoundIndex) {
+    console.log(selectRoundIndex)
+    commit(types.SELECT_ROUND_INDEX, selectRoundIndex)
+  },
 
 }
 	

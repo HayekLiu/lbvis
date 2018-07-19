@@ -24,7 +24,8 @@ export default {
   computed: {
     ...mapGetters({
       graphData: 'getGraphData',
-      selectRound: 'getSelectRound'
+      selectRound: 'getSelectRound',
+      selectRoundIndex: 'getSelectRoundIndex'
     }),
   },
   watch: {
@@ -37,6 +38,14 @@ export default {
       console.log('selected rounds: ', data)
       self.rounds = data
       this.reRankGraph(data, this.graphData['nodes'], this.graphData['links'], this.graphData['dists'], this.graphData['transfers'])
+    },
+    selectRoundIndex: function(data) {
+      console.log('selected rounds index: ', data)
+      self.rounds = []
+      for (var i = data[0]; i <= data[1]; i++) 
+        self.rounds.push(i);
+      console.log("test", self.rounds)
+      this.reRankGraph(self.rounds, this.graphData['nodes'], this.graphData['links'], this.graphData['dists'], this.graphData['transfers'])
     }
   },
   methods: {

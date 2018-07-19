@@ -25,12 +25,16 @@ export default {
   },
   watch: {
     graphData: function(data) {
+      var self = this;
       this.drawLineChart(data['balances'])
     }
   },
 
   methods: {
+    ...mapActions(['setSelectRoundIndex']),
     drawLineChart(data) {
+      var self = this;
+      self.setSelectRoundIndex(new Array(0, data.length-1))
       var containerWidth = +$('#overview-container').width()
       var containerHeight = +$('#overview-container').height()
       var margin = {top: 15, right: 15, bottom: 15, left: 15}
@@ -112,6 +116,33 @@ export default {
        .attr('text-anchor', 'middle')
        .attr('font-size', '8px');
 */       
+      function get_index(left, right){
+        var i, index_left=0, index_right=data.length-1;
+        i = 0;
+        while (i < data.length){
+          if(data[i].x >= left){
+            index_left = i;
+            break;
+          }
+          i+=1;
+        }
+        i = data.length;
+        while (i -= 1){
+          if(data[i].x <= right){
+            index_right = i;
+            break;
+          }
+        }
+        return new Array(index_left, index_right);
+      }
+
+      var brush = d3.svg.brush()
+          .x(x_line)
+          .on("brushend", function() {
+              var index = get_index(brush.extent()[0], brush.extent()[1])
+              self.setSelectRoundIndex(index)
+          });
+
       var line = d3.svg.line()
         .x(function (d, i) {
           return x_line(d.x) //i * lineWidth / (data.length - 1);
@@ -131,6 +162,14 @@ export default {
           return 1;
         })
         .attr("d", line);
+
+      lineG.append("g")
+        .attr("class", "brush")
+        .call(brush)
+        .selectAll("rect")
+        .attr("y", -6)
+        .attr("height", height + 7);
+
 /*  // dot on lines
       lineG.selectAll(".dot")
         .data(data)
