@@ -61,7 +61,7 @@ export default {
           })
         }
         
-    var max_round = 15, n_nodes = 32 
+    var max_round = 11, n_nodes = 32 
 
     //var min_workload, max_worload;
     var balances = [];
@@ -74,7 +74,7 @@ export default {
     if (error) throw error;
 
     data_b.forEach(function (d, i) {
-      // if (i < max_round) 
+      if (i < 60) 
       {
         balances.push({"x": +d.time, "y": +d.balance});
       }

@@ -28,7 +28,8 @@ export default {
   },
   computed: {
       ...mapGetters({
-        graphData: 'getGraphData'
+        graphData: 'getGraphData',
+        selectRoundIndex: 'getSelectRoundIndex'
       })
   },
   watch: {
@@ -59,6 +60,10 @@ export default {
 
       this.drawGlyph(workloadData, '#workloadDiv', 'workload')
       this.drawGlyph(blockData, '#blockDiv', 'count')
+    },
+
+    selectRoundIndex: function(data) {
+      // TODO
     }
   },
   methods: {

@@ -34,7 +34,7 @@ export default {
     ...mapActions(['setSelectRoundIndex']),
     drawLineChart(data) {
       var self = this;
-      self.setSelectRoundIndex(new Array(0, data.length-1))
+      // self.setSelectRoundIndex(new Array(0, data.length-1))
       var containerWidth = +$('#overview-container').width()
       var containerHeight = +$('#overview-container').height()
       var margin = {top: 15, right: 15, bottom: 15, left: 15}
@@ -140,7 +140,48 @@ export default {
           .x(x_line)
           .on("brushend", function() {
               var index = get_index(brush.extent()[0], brush.extent()[1])
+              console.log("brushed index:", index)
               self.setSelectRoundIndex(index)
+
+              // show sth in the range
+              lineG.selectAll(".brushedtexts").remove();
+              lineG.selectAll(".texts").data(data).enter().append('text')
+                .text(function (d,i) {
+                  if (i >= index[0] && i <= index[1]) return d.x.toFixed(1)+"s"; 
+                })
+                .attr("class", "brushedtexts")
+                .attr('x', function (d,i) {
+                  return x_line(d.x);
+                })
+                .attr('y', function (d,i) {
+                  return lineHeight - 4 // y_line(d.y) + 10;
+                })
+                .attr('text-anchor', 'middle')
+                .style('font-size', 10);
+
+              lineG.selectAll(".lbtexts").remove();
+              lineG.selectAll(".texts").data(data).enter().append('text')
+                .text(function (d,i) {
+                  if (i >= index[0] && i <= index[1]) return d.y.toFixed(3);  
+                })
+                .attr("class", "lbtexts")
+                .attr('x', function (d,i) {
+                  return x_line(d.x);
+                })
+                .attr('y', function (d,i) {
+                  return y_line(d.y) - 10;
+                })
+                .attr('text-anchor', 'middle')
+                .style('font-size', 10);
+
+              lineG.selectAll(".roundtexts")
+                .style("font-weight", function (d, i) {
+                  if (i >= index[0] && i <= index[1]) return "bold";
+                })
+                .style('font-size', function (d, i) {
+                  if (i >= index[0] && i <= index[1]) return 12;
+                  else return 10
+                })
           });
 
       var line = d3.svg.line()
@@ -170,26 +211,44 @@ export default {
         .attr("y", -6)
         .attr("height", height + 7);
 
-/*  // dot on lines
+  // dot on lines
       lineG.selectAll(".dot")
         .data(data)
         .enter().append("circle")
         .attr("class", "dot")
-        .attr("r", 4)
+        .attr("r", function(d, i) {
+          if (i < 45 && i != 0) return 2.5
+          else return 0
+        })
         .attr("cx", function (d, i) {
-          return i * lineWidth / (data.length - 1);
+          return x_line(d.x); // i * lineWidth / (data.length - 1);
         })
         .attr("cy", function (d, i) {
           return y_line(d.y);
         })
-        .attr("fill", "black")
+        .attr("fill", "white")
+        .attr("stroke", "black")
         .on("mouseover", function (d, i) {
           // TODO
         })
         .on("mouseout", function (d) {
           // TODO
         });
-*/
+
+      lineG.selectAll(".texts").data(data).enter().append('text')
+        .text(function (d,i) {
+          if (i < 45 && i != 0) return i; 
+        })
+        .attr("class", "roundtexts")
+        .attr('x', function (d,i) {
+          return x_line(d.x);
+        })
+        .attr('y', function (d,i) {
+          return lineHeight + 12 // y_line(d.y) + 10;
+        })
+        .attr('text-anchor', 'middle')
+        .style('font-size', 10);
+
     } 
   }
 }
