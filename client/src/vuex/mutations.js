@@ -6,7 +6,16 @@ export default {
   [types.SELECT_ROUND] (state, selectRound) {
     state.selectRound = selectRound
   },
-  [types.SELECT_ROUND_INDEX] (state, selectRoundIndex) {
-    state.selectRoundIndex = selectRoundIndex
+  [types.FILTER_ROUND_INDEX] (state, filterRoundIndex) {
+    state.filterRoundIndex = filterRoundIndex
+  },
+  [types.SELECT_RANKING_BY] (state, selectRankingBy) {
+    state.selectRankingBy = selectRankingBy
+  },
+  [types.SELECT_ALIGN_BLOCKS] (state, selectAlignBlocks) {
+    state.selectAlignBlocks = selectAlignBlocks
+  },
+  [types.RESET_GRAPH_VIEW] (state, resetGraphView) {
+    state.resetGraphView = resetGraphView
   },
 }

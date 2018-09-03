@@ -28,8 +28,7 @@ export default {
   },
   computed: {
       ...mapGetters({
-        graphData: 'getGraphData',
-        selectRoundIndex: 'getSelectRoundIndex'
+        graphData: 'getGraphData'
       })
   },
   watch: {

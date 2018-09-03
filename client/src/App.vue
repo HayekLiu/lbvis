@@ -32,7 +32,7 @@ export default {
   name: 'app',
   components: { myOverall, myGlyph, myGraph, mySimilar, mySpatial },
   methods: {
-    ...mapActions(['setGraphData', 'setSelectRound', 'setSelectRoundIndex']),
+    ...mapActions(['setGraphData', 'setSelectRound', 'setFilterRoundIndex', 'setSelectRankingBy', 'setSelectAlignBlocks', 'setResetGraphView']),
   },
   async created() {
     // axios.get("../static/resource/data32_2/block_transfer.csv").then(response => {  
@@ -68,15 +68,23 @@ export default {
     var nodes = [], max_nodes = [], links = [], dists = [], transfers = []
     //var transfer_json = {}, dist_json = {};
 
-    var dir = "static/resource/data"+n_nodes+"_2_full/"
+    var dir = "static/resource/data"+n_nodes+"_2_new/"
 
   d3.csv(dir + "balance.csv", function (error, data_b) {
     if (error) throw error;
 
     data_b.forEach(function (d, i) {
-      if (i < 60) 
+      if (i < 45) 
       {
-        balances.push({"x": +d.time, "y": +d.balance});
+        balances.push({
+          "time": +d.time, 
+          "balance": +d.balance,
+          "maxwl": +d.maxwl,
+          "minwl": +d.minwl,
+          "quartile1": +d.quartile1,
+          "median": +d.median,
+          "quartile2": +d.quartile2
+        });
       }
     });
 

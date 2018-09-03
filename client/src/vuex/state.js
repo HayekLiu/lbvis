@@ -2,7 +2,10 @@ import { playMode } from '../commons/config'
 const state = {
   graphData: {},
   selectRound: {},
-  selectRoundIndex: {},
+  filterRoundIndex: {},
+  selectRankingBy: {},
+  selectAlignBlocks: {},
+  resetGraphView: {},
   loading: true
 }
 export default state

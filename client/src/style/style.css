@@ -134,3 +134,8 @@ line { /*x轴上刻度标*/
     fill-opacity: .1;
     shape-rendering: crispEdges;
 }
+
+#overviewBox { 
+    text-align:right; 
+    float:right;
+}
