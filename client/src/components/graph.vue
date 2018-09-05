@@ -71,10 +71,25 @@ export default {
     },
 
     selectAlignBlocks: function (data) {
-      // TODO
-      // 计算所有block rect的新位置
-      // 改变位置
+      // 同一个proc的加框
       // hover加竖线，提示
+      // TODO 同一个round怎么放
+      this.is_align_blocks = data;
+      this.computeAlignBlockLists();
+
+      console.log("block_dist_array", this.block_dist_array);
+      console.log("block_align_lists", this.block_align_lists)
+
+      for (var idx in this.block_dist_array) {
+        var key = idx.split("|")
+
+        var round = parseInt(key[0]), name = parseInt(key[1]), flag = parseInt(key[2]);
+
+        console.log("key", round, name, flag)
+        if (flag == 1) this.updateInBlockDist(round, name, this.block_dist_array[idx])
+        else if (flag == 0) this.updateOutBlockDist(round, name, this.block_dist_array[idx]);
+        else alert("Error!!")
+      }
     },
 
     resetGraphView: function(data) {
@@ -123,6 +138,14 @@ export default {
       self.node_text_yOffset = 0
 
       self.selected_block = -1;
+
+
+      //self.block_round_name = []
+      //self.block_id_array = []
+      self.block_dist_array = {}
+      self.is_align_blocks = false;
+      self.block_align_lists = {}
+      self.block_lists_len = 0
 
       // to be changed
       /*self.selected_nodes = []
@@ -340,12 +363,46 @@ export default {
         .x(function (d) { return d[0] })
         .y(function (d) { return d[1] });
 
-      self.initGraphSettings(32, 32, 0.5)
+      self.initGraphSettings(64, 32, 0.5)
 
       self.filterData([], max_nodes, nodes, links, dists, transfers);
       self.drawProcLinks();
       self.drawProcNodes();
       self.drawMaxNodes();
+    },
+
+    computeAlignBlockLists()
+    {
+      var self = this
+
+      var block_array = {}
+      for (var idx in self.block_dist_array) {
+        var blockIdLists = self.block_dist_array[idx]
+
+        var key = idx.split("|")
+        var flag = parseInt(key[2]);
+
+        for (var i = 0; i < blockIdLists.length; i ++) {
+          var blockid
+          if (flag == 1) blockid = blockIdLists[i].blockid
+          else blockid = blockIdLists[i]
+          block_array[blockid] = 1
+        }
+      }
+
+      var block_lists = []
+      for (var idx in block_array)
+        block_lists.push(parseInt(idx))
+
+      block_lists.sort(function (a, b) { return a - b }); 
+
+      self.block_align_lists = {}
+      self.block_lists_len = block_lists.length
+      for (var i = 0; i < block_lists.length; i ++) {
+        //self.block_align_lists.push({"blockid": block_lists[i], "index": i})
+        var blockid = block_lists[i];
+        self.block_align_lists[blockid] = i;
+      }
     },
 
     computeRankingsByProcsWorkload(selected_rounds, data)
@@ -502,7 +559,7 @@ export default {
       var self = this
 
       self.clearGraphComponents();
-      self.initGraphSettings(32, 32, 0.5)
+      self.initGraphSettings(64, 32, 0.5)
 
       self.filterData([], max_nodes, nodes, links, dists, transfers);
       self.drawProcLinks();
@@ -1270,6 +1327,135 @@ export default {
       }
     },
 
+    updateInBlockDist(round, name, blockIdList) 
+    {
+      var self = this;
+      d3.selectAll('.in_block_dist'+round+name).remove();
+
+      var x1, y1
+      var block_len = blockIdList.length
+
+      if (self.is_align_blocks) {
+        x1 = Math.max(self.graphWidth/2 - self.max_block_rect_w*self.block_lists_len/2, -1 *self.node_r * 1.1);
+        y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) - self.node_r * 1.1 - self.max_block_rect_h;
+      } else {
+        x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1);  // start position of first rect.
+        y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) - self.node_r * 1.1 - self.max_block_rect_h; 
+        x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
+      }
+
+      var pnode_r;
+
+      for (var jname in self.node_json[round]) {
+        var s = self.node_json[round][jname]
+
+        if (parseInt(jname) == name) {
+          if (name == self.n_nodes) pnode_r = self.super_node_r;
+          else pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+        }
+      }
+
+      var xx1, yy1, xx2, yy2
+      xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes  // node_pos[round][progress_id][0],
+      yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) - pnode_r // node_pos[round][progress_id][1],
+      xx2 = x1 + self.max_block_rect_w * block_len/2
+      yy2 = y1 + self.max_block_rect_h
+      if (self.is_align_blocks) 
+        xx2 = x1 + self.max_block_rect_w*self.block_lists_len/2
+
+      var p1 = [xx1, yy1]
+      var p2 = [(xx2 + 3 * xx1)/4, (yy1 + yy2)/2]
+      var p3 = [(3 * xx2 + xx1)/4, (yy1 + yy2)/2]
+      var p4 = [xx2, yy2]
+      self.indist_link.append('path') // line from block rect. to self node
+        .datum([p1, p2, p3, p4])
+        .attr("d", self.lineGenaretor)
+        .attr("class", 'in_block_dist'+round+name) // "block-path"+round+progress_id+"block")
+        .attr("stroke", 'black')// TODO
+        .attr("stroke-opacity", 1)
+        .attr("stroke-width", 1)
+
+      var block_pos = {}
+      for (var i = 0; i < blockIdList.length; i ++) {
+        var blockid = blockIdList[i].blockid
+        block_pos[blockid] = [];
+      }
+
+      self.graphG.selectAll(".in_block_dist_rect"+round+name)
+          .attr("x", function (u, i) {
+            if (self.is_align_blocks) {
+              block_pos[u.blockid].push(x1 + self.max_block_rect_w*self.block_align_lists[u.blockid]+self.max_block_rect_w/2);
+              return x1 + self.max_block_rect_w*self.block_align_lists[u.blockid]
+            } else {
+              block_pos[u.blockid].push(x1 + self.max_block_rect_w*i+self.max_block_rect_w/2)
+              return x1 + self.max_block_rect_w*i
+            }
+          })
+          .attr("y", function (u, i) { 
+            block_pos[u.blockid].push(y1)
+            return y1; 
+          })
+
+      d3.select('.in_block_dist_rect_outline'+round+name).remove();
+      if (self.is_align_blocks) {
+        self.graphG.append('rect')
+          .attr("class", 'in_block_dist_rect_outline'+round+name)
+          .attr("x", x1-1)
+          .attr("y", y1-1)
+          .attr("width", self.max_block_rect_w*self.block_lists_len+2)
+          .attr("height", self.max_block_rect_h+2)
+          .attr("opacity", 1)
+          .attr("fill", "none")
+          .attr("stroke", "black")
+          .attr("stroke-dasharray", 5)
+          .attr("stroke-width", 0.5);
+      }
+
+      blockIdList.forEach(function (u) {
+          var snode_r;
+
+          for (var jname in self.node_json[parseInt(round)-1]) {
+            var s = self.node_json[parseInt(round)-1][jname]
+
+            if (parseInt(jname) == u.source) {
+              if (parseInt(jname) == self.n_nodes) snode_r = self.super_node_r;
+              else snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+            }
+          }
+  
+          var x1 = block_pos[u.blockid][0],
+              y1 = block_pos[u.blockid][1],
+              x2 = self.rankings[u.source] * self.graphWidth / self.n_display_nodes, // node_pos[round+1][index][0],
+              y2 = (round-self.rounds[0]-1) * self.graphHeight / (self.num_rounds - 1) + snode_r; // node_pos[round+1][index][1]
+
+          var p1 = [x1, y1]
+          var p2 = [(x2 + 3 * x1)/4, (y1 + y2)/2]
+          var p3 = [(3 * x2 + x1)/4, (y1 + y2)/2]
+          var p4 = [x2, y2]
+          self.indist_link.append('path') // curve lines from source node to block rect.
+            .datum([p1, p2, p3, p4])
+            .attr("d", self.lineGenaretor)
+            .attr("class", 'in_block_dist'+round+name) //"block-path"+round+progress_id+" block"+u)
+            .attr("id", u.blockid) // "line-block-"+lineIndex)
+            .attr('isLocal', u.isLocal)
+            .attr("fill", "none")
+            .attr("stroke", function () {
+              if (u.blockid == self.selected_block) {
+                if (u.isLocal == 1) return 'red'
+                else return 'green'
+              } else return 'black'
+            })// TODO
+            .attr("stroke-opacity", function () {
+              if (u.blockid == self.selected_block) return 1
+              else return 0.3;
+            })
+            .attr("stroke-width", function () {
+              if (u.blockid == self.selected_block) return 1.5
+              else return 1;
+            })
+        })
+    },
+
     addInBlockDist(round, name, blockid) 
     {
       var self = this;
@@ -1278,13 +1464,14 @@ export default {
           block_pos = {}
 
       var source; // for blockid >= 0
-
+ 
       for(var jsource in self.transfer_json[round-1]) {
         for (var jtarget in self.transfer_json[round-1][jsource]) {
           for (var bid in self.transfer_json[round-1][jsource][jtarget]) {
             var u = self.transfer_json[round-1][jsource][jtarget][bid]
 
-            if (parseInt(jtarget) == name && (blockid >= 0 ? parseInt(bid) == blockid : true)) {
+            if (parseInt(jtarget) == name && (blockid >= 0 ? parseInt(bid) == blockid : true)) 
+            {
               blockIdList.push({"source": parseInt(jsource), "target": parseInt(jtarget), "blockid": parseInt(bid), "isLocal": u.isLocal})
               block_pos[parseInt(bid)] = []
 
@@ -1295,6 +1482,12 @@ export default {
             }
           }
         }
+      }
+
+      if (blockid < 0) { // 为了装入block_dist_array，为了align blocks
+        var key = round + '|' + name + '|' + 1; // 1 for in and 0 for out
+        self.block_dist_array[key] = blockIdList;
+        console.log("addInBlockDist", self.block_dist_array)
       }
 
       blockIdList.sort(function (a, b) { return a["blockid"] - b["blockid"]; }); 
@@ -1316,7 +1509,7 @@ export default {
         }
       }
 
-      if (name == self.n_nodes) {
+      if (name == self.n_nodes) { // ???
         blockIdList.forEach(function (u) {
           var snode_r;
 
@@ -1365,13 +1558,13 @@ export default {
         var xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes,  // node_pos[round][progress_id][0],
             yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) - pnode_r, // node_pos[round][progress_id][1],
             xx2 = x1 + self.max_block_rect_w * block_len/2,
-            yy2 = y1
+            yy2 = y1 + self.max_block_rect_h
 
         var p1 = [xx1, yy1]
         var p2 = [(xx2 + 3 * xx1)/4, (yy1 + yy2)/2]
         var p3 = [(3 * xx2 + xx1)/4, (yy1 + yy2)/2]
         var p4 = [xx2, yy2]
-        self.indist_link.append('path')
+        self.indist_link.append('path') // line from block rect. to self node
           .datum([p1, p2, p3, p4])
           .attr("d", self.lineGenaretor)
           .attr("class", 'in_block_dist'+round+name) // "block-path"+round+progress_id+"block")
@@ -1389,7 +1582,7 @@ export default {
 
         //console.log("max_min_his_workload", max_his_workload, min_his_workload)
 
-        self.graphG.selectAll(".in_block_rect"+round+name)
+        self.graphG.selectAll(".in_block_dist_rect"+round+name) // block rects.
           .data(blockIdList)
           .enter().append("rect")
           .attr("class", "in_block_dist_rect"+round+name)
@@ -1481,7 +1674,7 @@ export default {
           var p2 = [(x2 + 3 * x1)/4, (y1 + y2)/2]
           var p3 = [(3 * x2 + x1)/4, (y1 + y2)/2]
           var p4 = [x2, y2]
-          self.indist_link.append('path')
+          self.indist_link.append('path') // curve lines from source node to block rect.
             .datum([p1, p2, p3, p4])
             .attr("d", self.lineGenaretor)
             .attr("class", 'in_block_dist'+round+name) //"block-path"+round+progress_id+" block"+u)
@@ -1510,6 +1703,12 @@ export default {
     {
       var self = this;
 
+      if (blockid < 0) {
+        var key = round + '|' + name + '|' + 1;
+        delete self.block_dist_array[key]
+        console.log("removeInBlockDist", self.block_dist_array)
+      }
+
       for(var source in self.transfer_json[round-1]) {
         for (var target in self.transfer_json[round-1][source]) {
           for (var bid in self.transfer_json[round-1][source][target]) {
@@ -1522,6 +1721,99 @@ export default {
 
       d3.selectAll('.in_block_dist'+round+name).remove();
       d3.selectAll('.in_block_dist_rect'+round+name).remove();
+    },
+
+    updateOutBlockDist(round, name, blockIdList) 
+    {
+      var self = this
+
+      d3.selectAll('.out_block_dist'+round+name).remove();
+ 
+      var x1, y1
+      if (self.is_align_blocks) {
+        x1 = Math.max(self.graphWidth/2 - self.max_block_rect_w*self.block_lists_len/2, -1 *self.node_r * 1.1);
+        y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) + self.node_r * 1.1;
+      } else {
+        var block_len = blockIdList.length
+        x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
+        y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) + self.node_r * 1.1; 
+        x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
+      }
+
+      var block_pos = {}
+      for (var i = 0; i < blockIdList.length; i ++) {
+        var blockid = blockIdList[i]
+        block_pos[blockid] = [];
+      }
+      
+      self.graphG.selectAll(".out_block_dist_rect"+round+name)
+        .attr("x", function (u, i) {
+          if (self.is_align_blocks) {
+              block_pos[u].push(x1 + self.max_block_rect_w*self.block_align_lists[u]+self.max_block_rect_w/2);
+              return x1 + self.max_block_rect_w*self.block_align_lists[u]
+            } else {
+              block_pos[u].push(x1 + self.max_block_rect_w*i+self.max_block_rect_w/2)
+              return x1 + self.max_block_rect_w*i
+          }
+        })
+        .attr("y", function (u, i) { 
+          block_pos[u].push(y1+self.max_block_rect_h)
+          return y1; 
+        })
+
+      for(var target in self.transfer_json[round][name]) {
+        for (var bid in self.transfer_json[round][name][target]) {
+          var u = self.transfer_json[round][name][target][bid]
+
+          if (self.filtered_nodes[parseInt(target)] == 1) {
+            var snode_r;
+
+            for (var jname in self.node_json[parseInt(round)+1]) {
+              var s = self.node_json[parseInt(round)+1][jname]
+
+              if (parseInt(jname) == parseInt(target)) {
+                if (parseInt(jname) == self.n_nodes) snode_r = self.super_node_r;
+                else snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+              }
+            }
+
+            var x1 = block_pos[parseInt(bid)][0],
+                y1 = block_pos[parseInt(bid)][1],
+                x2 = self.rankings[parseInt(target)] * self.graphWidth / self.n_display_nodes, 
+                y2 = (round-self.rounds[0]+1) * self.graphHeight / (self.num_rounds - 1) - snode_r; 
+/*
+            if (flag >= 0 && (self.indistpath_nodes[round][parseInt(target)] == 1 && self.indistselected_nodes[round][parseInt(target)] != 1 && parseInt(target) != self.n_nodes)) // for connecting outdist blocks and indist blocks (along the block transfer path) 如果有在block transfer path上的node，那么把线指向其上方的block
+              y2 = y2 + snode_r - self.node_r * 1.1 - self.max_block_rect_h;
+*/ // TODO 怎么处理这个复杂的玩意儿           
+            var p1 = [x1, y1]
+            var p2 = [(x2 + 3 * x1)/4, (y1 + y2)/2]
+            var p3 = [(3 * x2 + x1)/4, (y1 + y2)/2]
+            var p4 = [x2, y2]
+            self.outdist_link.append('path')
+              .datum([p1, p2, p3, p4])
+              .attr("d", self.lineGenaretor)
+              .attr("class", 'out_block_dist'+round+name) //"block-path"+round+progress_id+" block"+u)
+              .attr("id", parseInt(bid)) // "line-block-"+lineIndex)
+              .attr("isLocal", u.isLocal)
+              .attr("fill", "none")
+              .attr("stroke", function () {
+                if (parseInt(bid) == self.selected_block) {
+                  if (u.isLocal == 1) return 'red'
+                  else return 'green'
+                } else return 'black'
+              })// TODO
+              .attr("stroke-opacity", function () {
+                if (parseInt(bid) == self.selected_block) return 1
+                else return 0.3;
+              })
+              .attr("stroke-width", function () {
+                if (parseInt(bid) == self.selected_block) return 1.5
+                else return 1;
+              })
+            //lineIndex+=1
+          }
+        }
+      }
     },
 
     addOutBlockDist(round, name, flag) // add a flag only for connecting ...
@@ -1549,6 +1841,13 @@ export default {
             block_pos[parseInt(bid)] = []
           }
         }
+      }
+
+      { // 为了装入block_dist_array，为了align blocks
+        var key = round + '|' + name + '|' + 0; // 1 for in and 0 for out
+        self.block_dist_array[key] = blockIdList;
+
+        console.log("addOutBlockDist", self.block_dist_array)
       }
 
       blockIdList.sort(function (a, b) {
@@ -1610,7 +1909,7 @@ export default {
         }
       })
 
-      self.graphG.selectAll(".out_block_rect"+round+name)
+      self.graphG.selectAll(".out_block_dist_rect"+round+name)
         .data(blockIdList)
         .enter().append("rect")
         .attr("class", "out_block_dist_rect"+round+name)
@@ -1738,6 +2037,10 @@ export default {
     removeOutBlockDist(round, name)
     {
       var self = this;
+
+      var key = round + '|' + name + '|' + 0
+      delete self.block_dist_array[key]
+      console.log("removeOutBlockDist", self.block_dist_array)
 
       for(var target in self.transfer_json[round][name]) {
         for (var bid in self.transfer_json[round][name][target]) {

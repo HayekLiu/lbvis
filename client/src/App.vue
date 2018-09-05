@@ -61,7 +61,7 @@ export default {
           })
         }
         
-    var max_round = 11, n_nodes = 32 
+    var max_round = 11, n_nodes = 64 
 
     //var min_workload, max_worload;
     var balances = [];
