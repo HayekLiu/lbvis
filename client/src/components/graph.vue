@@ -87,7 +87,7 @@ export default {
 
         console.log("key", round, name, flag)
         if (flag == 1) this.updateInBlockDist(round, name, this.block_dist_array[idx])
-        else if (flag == 0) this.updateOutBlockDist(round, name, this.block_dist_array[idx]);
+        else if (flag == 0) this.updateOutBlockDist(round, name, this.block_dist_array[idx]); // 不是很想用这个
         else alert("Error!!")
       }
     },
@@ -271,6 +271,10 @@ export default {
       self.selected_block = -1;
       self.focused_round = -1
       self.focused_name = -1;
+
+      self.block_dist_array = {}
+      self.block_align_lists = {}
+      self.block_lists_len = 0
 
       for (var i = 0; i < self.rounds.length; i ++) {
         var index = self.rounds[i]-1;
@@ -1359,7 +1363,7 @@ export default {
       xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes  // node_pos[round][progress_id][0],
       yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) - pnode_r // node_pos[round][progress_id][1],
       xx2 = x1 + self.max_block_rect_w * block_len/2
-      yy2 = y1 + self.max_block_rect_h
+      yy2 = y1 + self.max_block_rect_h + 1
       if (self.is_align_blocks) 
         xx2 = x1 + self.max_block_rect_w*self.block_lists_len/2
 
@@ -1394,6 +1398,47 @@ export default {
           .attr("y", function (u, i) { 
             block_pos[u.blockid].push(y1)
             return y1; 
+          })
+          .on('mouseover', function (u) {
+            d3.select(this).attr("stroke-width", 1);   
+
+            var x1
+            if (self.is_align_blocks) {
+              x1 = Math.max(self.graphWidth/2 - self.max_block_rect_w*self.block_lists_len/2, -1 *self.node_r * 1.1);
+            } else {
+              var block_len = blockIdList.length
+              x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1);  // start position of first rect.
+              x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
+            }
+
+            if (self.is_align_blocks) {
+              self.graphG.append("line")
+                .attr("class", "block_align_line")
+                .attr('x1', function () {
+                  return x1 + self.max_block_rect_w*self.block_align_lists[u.blockid]+self.max_block_rect_w/2
+                })
+                .attr('y1', 0)
+                .attr('x2', function () {
+                  return x1 + self.max_block_rect_w*self.block_align_lists[u.blockid]+self.max_block_rect_w/2
+                })
+                .attr('y2', self.graphHeight)
+                .attr('fill', 'none')
+                .attr('stroke', 'light gray')
+                .attr('stroke-width', 0.25)
+                .style("stroke-dasharray","5,5")
+            } 
+            
+            self.blockRectMouseOver(u.blockid);
+          })
+          .on("mouseout", function (u) { 
+            d3.select(this).attr("stroke-width", function (s) {
+              if (s.blockid == self.selected_block) return 1;
+              else return 0.5;
+            })
+
+            self.graphG.select(".block_align_line").remove()
+
+            self.blockRectMouseOut(u.blockid);
           })
 
       d3.select('.in_block_dist_rect_outline'+round+name).remove();
@@ -1723,7 +1768,7 @@ export default {
       d3.selectAll('.in_block_dist_rect'+round+name).remove();
     },
 
-    updateOutBlockDist(round, name, blockIdList) 
+    updateOutBlockDist(round, name, blockIdList) // TODO do not want to use this actually
     {
       var self = this
 
@@ -1740,6 +1785,37 @@ export default {
         x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
       }
 
+      var pnode_r;
+
+      for (var jname in self.node_json[round]) {
+        var s = self.node_json[round][jname]
+
+        if (parseInt(jname) == name) {
+          if (name == self.n_nodes) pnode_r = self.super_node_r // cannot happen
+          else pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+        }
+      }
+
+      var xx1, yy1, xx2, yy2
+      xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes  // node_pos[round][progress_id][0],
+      yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) + pnode_r // node_pos[round][progress_id][1],
+      xx2 = x1 + self.max_block_rect_w * block_len/2
+      yy2 = y1 - 1
+      if (self.is_align_blocks) 
+        xx2 = x1 + self.max_block_rect_w*self.block_lists_len/2
+
+      var p1 = [xx1, yy1]
+      var p2 = [(xx2 + 3 * xx1)/4, (yy1 + yy2)/2]
+      var p3 = [(3 * xx2 + xx1)/4, (yy1 + yy2)/2]
+      var p4 = [xx2, yy2]
+      self.outdist_link.append('path')
+        .datum([p1, p2, p3, p4])
+        .attr("d", self.lineGenaretor)
+        .attr("class", 'out_block_dist'+round+name) // "block-path"+round+progress_id+"block")
+        .attr("stroke", 'black')
+        .attr("stroke-opacity", 1)
+        .attr("stroke-width", 1)
+
       var block_pos = {}
       for (var i = 0; i < blockIdList.length; i ++) {
         var blockid = blockIdList[i]
@@ -1749,17 +1825,73 @@ export default {
       self.graphG.selectAll(".out_block_dist_rect"+round+name)
         .attr("x", function (u, i) {
           if (self.is_align_blocks) {
-              block_pos[u].push(x1 + self.max_block_rect_w*self.block_align_lists[u]+self.max_block_rect_w/2);
-              return x1 + self.max_block_rect_w*self.block_align_lists[u]
-            } else {
-              block_pos[u].push(x1 + self.max_block_rect_w*i+self.max_block_rect_w/2)
-              return x1 + self.max_block_rect_w*i
+            block_pos[u].push(x1 + self.max_block_rect_w*self.block_align_lists[u]+self.max_block_rect_w/2);
+            return (x1 + self.max_block_rect_w*self.block_align_lists[u])
+          } else {
+            block_pos[u].push(x1 + self.max_block_rect_w*i+self.max_block_rect_w/2)
+            return (x1 + self.max_block_rect_w*i)
           }
         })
         .attr("y", function (u, i) { 
           block_pos[u].push(y1+self.max_block_rect_h)
           return y1; 
         })
+        .on('mouseover', function (u) {
+          d3.select(this).attr("stroke-width", 1);   
+
+          var x1
+          if (self.is_align_blocks) {
+            x1 = Math.max(self.graphWidth/2 - self.max_block_rect_w*self.block_lists_len/2, -1 *self.node_r * 1.1);
+          } else {
+            var block_len = blockIdList.length
+            x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
+            x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
+          }
+
+          if (self.is_align_blocks) {
+            self.graphG.append("line")
+              .attr("class", "block_align_line")
+              .attr('x1', function () {
+                return x1 + self.max_block_rect_w*self.block_align_lists[u]+self.max_block_rect_w/2
+              })
+              .attr('y1', 0)
+              .attr('x2', function () {
+                return x1 + self.max_block_rect_w*self.block_align_lists[u]+self.max_block_rect_w/2
+              })
+              .attr('y2', self.graphHeight)
+              .attr('fill', 'none')
+              .attr('stroke', 'light gray')
+              .attr('stroke-width', 0.25)
+              .style("stroke-dasharray","5,5")
+            } 
+
+          self.blockRectMouseOver(u);
+        })
+        .on("mouseout", function (u) { 
+          d3.select(this).attr("stroke-width", function (s) {
+            if (s == self.selected_block) return 1;
+            else return 0.5;
+          })
+
+          self.graphG.select(".block_align_line").remove()
+
+          self.blockRectMouseOut(u);
+        })
+
+      d3.select('.out_block_dist_rect_outline'+round+name).remove();
+      if (self.is_align_blocks) {
+        self.graphG.append('rect')
+          .attr("class", 'out_block_dist_rect_outline'+round+name)
+          .attr("x", x1-1)
+          .attr("y", y1-1)
+          .attr("width", self.max_block_rect_w*self.block_lists_len+2)
+          .attr("height", self.max_block_rect_h+2)
+          .attr("opacity", 1)
+          .attr("fill", "none")
+          .attr("stroke", "black")
+          .attr("stroke-dasharray", 5)
+          .attr("stroke-width", 0.5);
+      }
 
       for(var target in self.transfer_json[round][name]) {
         for (var bid in self.transfer_json[round][name][target]) {
