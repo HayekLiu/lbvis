@@ -2,15 +2,15 @@
   <div id="app">
     <nav class="navbar navbar-default" role="navigation">
       <div class="navbar-header">
-        <a class="navbar-brand" href="#">LBVis: Interactively Visualizing the Dynamic Load Balancing in Parallel Particle Tracing</a>
+        <a class="navbar-brand" href="#">LBVis: Interactive Dynamic Load Balancing Visualization for Parallel Particle Tracing</a>
       </div>
     </nav>
     <div id="content">
       <!-- <myRank id="rank-container"></myRank> -->
       <myOverall id="overview-container"></myOverall>
-      <myGlyph id="glyph-container"></myGlyph>
+      <!--<myGlyph id="glyph-container"></myGlyph> -->
       <myGraph id="load-balance-container"></myGraph>
-      <mySimilar id="similarity-container"></mySimilar>
+      <!--<mySimilar id="similarity-container"></mySimilar>-->
       <mySpatial id="spatial-container"></mySpatial>
     </div>
   </div>
@@ -22,17 +22,18 @@ import BootstrapVue from 'bootstrap-vue'
 import myOverall from './components/overview.vue'
 import myGraph from './components/graph.vue'
 //import myRank from './components/rank.vue'
-import myGlyph from './components/glyph.vue'
-import mySimilar from './components/similarity.vue'
+//import myGlyph from './components/glyph.vue'
+//import mySimilar from './components/similarity.vue'
 import mySpatial from './components/spatial.vue'
 import $ from 'jquery'
 import { mapActions, mapGetters } from 'vuex'
 import axios from 'axios'
 export default {
   name: 'app',
-  components: { myOverall, myGlyph, myGraph, mySimilar, mySpatial },
+  // components: { myOverall, myGraph, mySimilar, mySpatial },
+  components: { myOverall, myGraph, mySpatial },
   methods: {
-    ...mapActions(['setGraphData', 'setSelectRound', 'setFilterRoundIndex', 'setSelectRankingBy', 'setSelectAlignBlocks', 'setResetGraphView']),
+    ...mapActions(['setGraphData', 'setSelectRound', 'setFilterRoundIndex', 'setSelectRankingBy', 'setSelectAlignBlocks', 'setResetGraphView', 'setRoundProcBlock']),
   },
   async created() {
     // axios.get("../static/resource/data32_2/block_transfer.csv").then(response => {  
@@ -61,20 +62,23 @@ export default {
           })
         }
         
-    var max_round = 11, n_nodes = 64 
+    var max_round = 15, n_nodes = 32 
 
     //var min_workload, max_worload;
     var balances = [];
     var nodes = [], max_nodes = [], links = [], dists = [], transfers = []
     //var transfer_json = {}, dist_json = {};
 
-    var dir = "static/resource/data"+n_nodes+"_2_new/"
+    var dir = "static/resource/fieldlines/nek_"+n_nodes+"_2/" // 1.573 load-balancing
+    //var dir = "static/resource/changhe.yang/nek_"+n_nodes+"_2/"
+
+    //var dir = "static/resource/backup/data"+n_nodes+"_2_new/"
 
   d3.csv(dir + "balance.csv", function (error, data_b) {
     if (error) throw error;
 
     data_b.forEach(function (d, i) {
-      if (i < 45) 
+      if (i < 16) 
       {
         balances.push({
           "time": +d.time, 
@@ -284,40 +288,32 @@ export default {
       position: absolute;
       top: 0;
       left: 0;
-      width: 75%;
-      height: 15%;
+      width: 100%;
+      height: 12%;
       border: 1px solid grey;
-    }
-    #glyph-container {
-      position: absolute;
-      top: 15%;
-      left: 0%;
-      width: 5%;
-      height: 85%;
-      border: 0px solid grey;
     }
     #load-balance-container {
       position: absolute;
-      top: 15%;
-      left: 5%;
-      width: 70%;
-      height: 85%;
+      top: 12%;
+      left: 0%;
+      width: 80%;
+      height: 88%;
       border: 1px solid grey;
     }
     #similarity-container {
       position: absolute;
-      top: 0;
-      left: 75%;
-      width: 25%;
-      height: 50%;
+      top: 12%;
+      left: 80%;
+      width: 20%;
+      height: 44%;
       border: 1px solid grey;
     }
     #spatial-container {
       position: absolute;
-      top: 50%;
-      left: 75%;
-      width: 25%;
-      height: 50%;
+      top: 56%;
+      left: 80%;
+      width: 20%;
+      height: 44%;
       border: 1px solid grey;
     }
   }

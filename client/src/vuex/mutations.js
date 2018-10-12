@@ -18,4 +18,7 @@ export default {
   [types.RESET_GRAPH_VIEW] (state, resetGraphView) {
     state.resetGraphView = resetGraphView
   },
+  [types.ROUND_PROC_BLOCK] (state, roundProcBlock) {
+    state.roundProcBlock = roundProcBlock
+  },
 }

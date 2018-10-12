@@ -24,4 +24,8 @@ export default {
     console.log(resetGraphView)
     commit(types.RESET_GRAPH_VIEW, resetGraphView)
   },
+  setRoundProcBlock({ commit, state }, roundProcBlock) {
+    console.log(roundProcBlock)
+    commit(types.ROUND_PROC_BLOCK, roundProcBlock)
+  },
 }

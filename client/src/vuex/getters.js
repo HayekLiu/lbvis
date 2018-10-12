@@ -5,5 +5,6 @@ export default {
 	getFilterRoundIndex: state=>state.filterRoundIndex,
 	getSelectRankingBy: state=>state.selectRankingBy,
 	getSelectAlignBlocks: state=>state.selectAlignBlocks,
-	getResetGraphView: state=>state.resetGraphView
+	getResetGraphView: state=>state.resetGraphView,
+	getRoundProcBlock: state=>state.roundProcBlock
 }

@@ -27,6 +27,8 @@
     "leaflet-d3-svg-overlay": "^2.2.0",
     "leafletjs-canvas-overlay": "^1.0.1",
     "mapbox-gl": "^0.43.0",
+    "three": "^0.97.0",
+    "three-orbit-controls": "^82.1.0",
     "timeengine": "^6.6.99",
     "vue": "^2.5.2",
     "vue-router": "^3.0.1",

@@ -3,7 +3,7 @@
     <div id="overall-control">
       <div id="overall-control-top">
         <div class="radiobutton" id="radiobutton-left">
-          <span id="overviewDiv">
+          <h4><span id="overviewDiv">
             &nbsp&nbsp&nbsp&nbspY-axis-scale:&nbsp
             <input name="optionsRadios" id="linearScale" type="radio" checked>&nbspLinear&nbsp
             <input name="optionsRadios" id="logScale" type="radio">&nbspLog&nbsp
@@ -12,6 +12,7 @@
           <span id="overviewBox">
             <input name="box" id="boxCheck" type="checkbox">&nbspBoxplot of Proc. Exec. Time&nbsp&nbsp&nbsp
           </span>
+        </h4>
         </div>
       </div>
       <div id="overall-control-bottom">
@@ -75,7 +76,11 @@ export default {
       self.y_line = null
       self.y_wl = null
 
+      self.yAxis = null
+
       self.lineG = null;
+
+      self.num_rounds = 40;
     },
 
     drawLineChart(data) {
@@ -84,7 +89,7 @@ export default {
       // self.setSelectRoundIndex(new Array(0, data.length-1))
       var containerWidth = +$('#overview-container').width()
       var containerHeight = +$('#overview-container').height()
-      var margin = {top: 10, right: 15, bottom: 35, left: 15}
+      var margin = {top: 10, right: 15, bottom: 45, left: 30}
       var svg = d3.select("#overview-container")
         .append('svg')
         .attr('width', containerWidth)
@@ -115,7 +120,7 @@ export default {
 
       console.log(self.mx_line, self.my_line, self.max_rwl, self.min_rwl);
       self.x_line.domain([0, self.mx_line])  // Math.ceil(mx_line)
-      self.y_line.domain([1, self.my_line]) // Math.ceil(my_line)
+      self.y_line.domain([1, 3])//Math.ceil(self.my_line)]) // Math.ceil(my_line)
 
       self.y_wl.domain([0, self.max_rwl]);
 
@@ -156,6 +161,13 @@ export default {
         .attr("stroke", "#000")
         .attr("fill", "none")
 
+      self.yAxis = d3.svg.axis().scale(self.y_line).orient("left").ticks(5).tickFormat(d3.format(".1f"));
+
+      self.lineG.append("g")
+        .attr('class', 'y_axis')
+        .attr("transform", "translate("+5+",0)")
+        .call(self.yAxis);
+
       self.lineG.append("line")
         .attr('x1', 0)
         .attr('y1', self.lineHeight)
@@ -164,7 +176,7 @@ export default {
         .attr('fill', 'none')
         .attr('stroke', '#000000')
         .attr('stroke-width', 1)
-        .attr("marker-end", "url(#end)");
+        //.attr("marker-end", "url(#end)");
 
       self.lineG.append("line")
         .attr('x1', 0)
@@ -268,7 +280,7 @@ export default {
 
       self.lineG.selectAll(".texts").data(data).enter().append('text')
         .text(function (d,i) {
-          if (i < 45 && i != 0) return i; 
+          if (i < self.num_rounds && i != 0) return i; 
         })
         .attr("class", "roundtexts")
         .attr('x', function (d,i) {
@@ -309,7 +321,7 @@ export default {
         .enter().append("circle")
         .attr("class", "dot")
         .attr("r", function(d, i) {
-          if (i < 45 && i != 0) return 2.5
+          if (i < self.num_rounds && i != 0) return 2.5
           else return 0
         })
         .attr("cx", function (d, i) {
@@ -484,8 +496,12 @@ export default {
         self.y_line = d3.scale.log().range([self.lineHeight, 0]);
         self.y_wl = d3.scale.log().range([self.lineHeight, 0])
       }
-      self.y_line.domain([1, self.my_line]) // Math.ceil(my_line)
+      self.y_line.domain([1, 3])//Math.ceil(self.my_line)]) // Math.ceil(my_line)
       self.y_wl.domain([0, self.max_rwl]);
+
+      self.yAxis = d3.svg.axis().scale(self.y_line).orient("left").ticks(5).tickFormat(d3.format(".1f"));
+      self.lineG.select('.y_axis')
+        .call(self.yAxis);
 
       // line chart
       self.lineG.selectAll('path').remove();

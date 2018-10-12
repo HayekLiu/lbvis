@@ -1,7 +1,30 @@
 <template>
-  <div>
- 
+  <div id='rankContainer' ref="rankContainer">
+    <div id="rank-control">
+      <div id="rank-control-top">
+        <h4>&nbsp&nbsp&nbsp&nbspRanking by:&nbsp
+        <select id="rankDiv">
+            <option value="0">Proc. Workload</option>
+            <option value="1">Block Count</option>
+            <option value="2">Avg. Block Workload</option>
+            <option value="3">Particle Count</option>
+            <option value="4">Avg. Particle Workload</option>
+        </select>
+        <span id="optionDiv">
+            &nbsp&nbsp&nbsp&nbspOptions:&nbsp
+            <input name="boxAlign" id="boxAlignCheck" type="checkbox">&nbspAlign Blocks&nbsp&nbsp
+            <input name="reOrder" id="reOrderCheck" type="checkbox">&nbspReorder Graph&nbsp&nbsp&nbsp
+            <input name="reset" id="resetButton" type="button" value=" Reset Graph ">
+        </span>
+        </h4>
+      </div>
+      <div id="rank-control-bottom">
+      </div>
+    </div>
+    <div id="rank-bar">
+    </div>
   </div>
+  
 </template>
 <script>
 
@@ -44,7 +67,7 @@ export default {
       this.reRankGraph(this.graphData['max_nodes'], this.graphData['nodes'], this.graphData['links'], this.graphData['dists'], this.graphData['transfers'])
     },
     filterRoundIndex: function(data) {
-      console.log('selected rounds index: ', data)
+      // console.log('selected rounds index: ', data)
       if (!(data[0] == this.rounds[0] && data[1] == this.rounds[this.rounds.length-1])) {
         this.num_rounds = 0
         this.rounds = []
@@ -77,15 +100,15 @@ export default {
       this.is_align_blocks = data;
       this.computeAlignBlockLists();
 
-      console.log("block_dist_array", this.block_dist_array);
-      console.log("block_align_lists", this.block_align_lists)
+      //console.log("block_dist_array", this.block_dist_array);
+      //console.log("block_align_lists", this.block_align_lists)
 
       for (var idx in this.block_dist_array) {
         var key = idx.split("|")
 
         var round = parseInt(key[0]), name = parseInt(key[1]), flag = parseInt(key[2]);
 
-        console.log("key", round, name, flag)
+        //console.log("key", round, name, flag)
         if (flag == 1) this.updateInBlockDist(round, name, this.block_dist_array[idx])
         else if (flag == 0) this.updateOutBlockDist(round, name, this.block_dist_array[idx]); // 不是很想用这个
         else alert("Error!!")
@@ -99,22 +122,31 @@ export default {
     }
   },
   methods: {
+    ...mapActions(['setRoundProcBlock']),
+
     init(){
       var self = this;
 
       self.tg = null
 
+      self.glyphWidth = 0
+      self.paddingWidth = 0
+      self.paddingHeight = 0
       self.graphWidth = 0
       self.graphHeight = 0
       self.graphG = null;
       self.tooltipId = "gates_tooltip"
 
+      self.textG = null
+      self.roundG = null
+      self.glyphG = null
+
       self.compute = null
       self.lineGenaretor = null
 
-      self.init_rounds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] // filtered rounds from overview plot
+      self.init_rounds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // filtered rounds from overview plot
       self.rounds = self.init_rounds
-      self.num_rounds = 11
+      self.num_rounds = 15
 
       self.selected_rounds = [] // selected rounds from summary plot
 
@@ -137,8 +169,8 @@ export default {
       self.node_text_xOffset = 0
       self.node_text_yOffset = 0
 
-      self.selected_block = -1;
-
+      //self.selected_block = -1;
+      self.selected_blocks = []
 
       //self.block_round_name = []
       //self.block_id_array = []
@@ -146,6 +178,11 @@ export default {
       self.is_align_blocks = false;
       self.block_align_lists = {}
       self.block_lists_len = 0
+
+      self.is_reorder = false // 注意：选reorder时graph上只能有block transfer path
+      self.distances = {} 
+
+      self.endx = 0
 
       // to be changed
       /*self.selected_nodes = []
@@ -160,6 +197,12 @@ export default {
       self.outdistnodes_target = []
       self.indistnodes_source = [];*/
       // ↑
+
+      self.init_nodes = []
+      self.init_max_nodes = []
+      self.init_links = []
+      self.init_dists = []
+      self.init_transfers = []
 
       self.selected_nodes = {}
       self.highlighted_nodes = {}
@@ -179,6 +222,8 @@ export default {
       self.focused_round = -1
       self.focused_name = -1;
 
+      self.raw_rankings = {}
+
       self.rankings = {};
       self.filtered_nodes = {}
       self.display_nodes_array = []
@@ -194,6 +239,8 @@ export default {
       self.max_all_npts = 0
       self.min_npts = 0
       self.max_npts = 0
+      self.min_nblocks = 0
+      self.max_nblocks = 0
       self.min_nfdpts = 0
       self.max_nfdpts = 0
       self.min_nufdpts = 0
@@ -203,9 +250,12 @@ export default {
       self.min_link_count = 0
       self.max_link_count = 0
  
+      self.resolution = 32
+
       //self.nodes = []
       self.max_nodes = []
       //self.links = []
+      self.node_wls = {}
       self.node_json = {}
       self.link_json = {}
       self.transfer_json = {}
@@ -239,7 +289,7 @@ export default {
       self.super_node_r = self.node_r * 1.2
       self.rect_xOffset = self.node_r * 1.3
       self.rect_yOffset = self.node_r * 1.3
-      self.max_block_rect_w = ((self.graphHeight-self.node_r*2)/(self.num_rounds-1))/6 // 12
+      self.max_block_rect_w = Math.min(self.node_r, ((self.graphHeight-self.node_r*2)/(self.num_rounds-1))/6) // 12
       self.max_block_rect_h = self.max_block_rect_w // 12
       self.node_text_size = self.max_node2_r * 0.8
       self.node_text_xOffset = self.max_node2_r*(-1)
@@ -252,9 +302,24 @@ export default {
     {
       var self = this
 
+      self.textG.remove();
+      self.textG = self.tg.append("g")
+        .attr('transform', "translate(" + (self.paddingWidth+30) + ","+ 0 + ")")
+        .attr('class', 'text-g');
+
+      self.roundG.remove();
+      self.roundG = self.tg.append("g")
+        .attr('transform', "translate(" + 0 + ","+ self.paddingHeight + ")")
+        .attr('class', 'round-g');
+
+      self.glyphG.remove()
+      self.glyphG = self.tg.append("g")
+        .attr('transform', "translate(" + 30 + ","+ self.paddingHeight + ")")
+        .attr('class', 'glygh-g');
+
       self.graphG.remove();
       self.graphG = self.tg.append("g")
-        .attr('transform', "translate(" + 20 + ",0)")
+        .attr('transform', "translate(" + (self.paddingWidth+30) + ","+ self.paddingHeight + ")")
         .attr('class', 'graph-g');
 
       self.node = self.graphG.append('g');
@@ -268,13 +333,19 @@ export default {
     {
       var self = this
 
-      self.selected_block = -1;
+      self.choice = 0;
+   
+      //self.selected_block = -1;
+      self.selected_blocks = []
       self.focused_round = -1
       self.focused_name = -1;
 
+      self.is_align_blocks = false;
       self.block_dist_array = {}
       self.block_align_lists = {}
       self.block_lists_len = 0
+
+      self.selected_rounds = []
 
       for (var i = 0; i < self.rounds.length; i ++) {
         var index = self.rounds[i]-1;
@@ -298,11 +369,22 @@ export default {
           self.indistnodes_source[index][dnode] = 0
         }
       }
+
+      self.rankings = self.raw_rankings
+
+      self.is_reorder = false // 选reorder时graph上只能有block transfer path
+      self.distances = {}
+
+      self.endx = 0
     },
 
     clearGraphViewInteract()
     {
       var self = this
+    
+      $("select#rankDiv").val("0")
+      $("#boxAlignCheck").prop("checked", false);
+      $("#reOrderCheck").prop("checked", false);
 
       self.clearGraphComponents();
       self.clearVars();
@@ -310,12 +392,66 @@ export default {
       self.drawProcLinks();
       self.drawProcNodes();
       self.drawMaxNodes();
+      self.drawViolinPlot();
+      self.drawRoundIndex()
     },
 
     drawGraph(nodes, max_nodes, links, dists, transfers) 
     {
       var self = this
 
+      self.init_nodes = nodes
+      self.init_max_nodes = max_nodes
+      self.init_links = links
+      self.init_dists = dists
+      self.init_transfers = transfers
+
+      $("select#rankDiv").change(function(){
+        // console.log($(this).val());
+        if ($(this).val() == "0") self.choice = 0; // Proc. Workload
+        else if ($(this).val() == "1") self.choice = 1; // Block Count
+        else if ($(this).val() == "2") self.choice = 2; // Avg. Block Workload
+        else if ($(this).val() == "3") self.choice = 3; // Particle Count
+        else if ($(this).val() == "4") self.choice = 4; // Avg. Particle Workload
+        else alert("巴嘎!")
+
+        self.reRankGraph(max_nodes, nodes, links, dists, transfers)
+      });
+
+      $("#boxAlignCheck").click(function(evt) {
+        self.is_align_blocks = !self.is_align_blocks;
+
+        self.computeAlignBlockLists();
+
+        //console.log("block_dist_array", this.block_dist_array);
+        //console.log("block_align_lists", this.block_align_lists)
+
+        for (var idx in self.block_dist_array) {
+          var key = idx.split("|")
+
+          var round = parseInt(key[0]), name = parseInt(key[1]), flag = parseInt(key[2]);
+
+          //console.log("key", round, name, flag)
+          if (flag == 1) self.updateInBlockDist(round, name, self.block_dist_array[idx])
+          else if (flag == 0) self.updateOutBlockDist(round, name, self.block_dist_array[idx]); // 不是很想用这个
+          else alert("Error!!")
+        }
+      });
+
+      $("#reOrderCheck").click(function(evt) {
+        self.is_reorder = !self.is_reorder
+
+        if (self.is_reorder)
+          self.reOrderGraph();
+        else {
+          self.rankings = self.raw_rankings;
+          self.updateGraph()
+        }
+      })
+
+      $("#resetButton").on('click',function (evt) {
+        self.clearGraphViewInteract();
+      });
       //self.nodes = nodes,
       //self.max_nodes = max_nodes
       //self.links = links,
@@ -324,7 +460,7 @@ export default {
 
       var containerWidth = +$('#load-balance-container').width()
       var containerHeight = +$('#load-balance-container').height()
-      var margin = {top: 20, right: 15, bottom: 20, left: 10}
+      var margin = {top: 25, right: 15, bottom: 60, left: 15}
       var svg = d3.select("#load-balance-container")
         .append('svg')
         .attr('width', containerWidth)
@@ -336,7 +472,7 @@ export default {
                   .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
                   .attr('id', 'container-g')
 
-      var tool_width = 180
+      var tool_width = 200
 
       $("body").append("<div class='tooltip' id='" + self.tooltipId + "'></div>");
       $("#" + self.tooltipId).css("width", tool_width);
@@ -344,11 +480,27 @@ export default {
 
       var topWrapperHeight = height; // height*1.5
 
-      self.graphWidth = width
-      self.graphHeight = topWrapperHeight
+      self.glyphWidth = 120
+      self.paddingWidth = 150;
+      self.paddingHeight = 30
+
+      self.graphWidth = width - self.paddingWidth
+      self.graphHeight = topWrapperHeight - self.paddingHeight
+
+      self.textG = self.tg.append("g")
+        .attr('transform', "translate(" + (self.paddingWidth+30) + ","+ 0 + ")")
+        .attr('class', 'text-g');
+
+      self.roundG = self.tg.append("g")
+        .attr('transform', "translate(" + 0 + ","+ self.paddingHeight + ")")
+        .attr('class', 'round-g');
+
+      self.glyphG = self.tg.append("g")
+        .attr('transform', "translate(" + 30 + ","+ self.paddingHeight + ")")
+        .attr('class', 'glygh-g');
 
       self.graphG = self.tg.append("g")
-        .attr('transform', "translate(" + 20 + ",0)")
+        .attr('transform', "translate(" + (self.paddingWidth+30) + ","+ self.paddingHeight + ")")
         .attr('class', 'graph-g');
 
       self.node = self.graphG.append('g');
@@ -359,20 +511,23 @@ export default {
 
       self.menu = self.contextMenu().items('Incoming Block Dist.', 'Outgoing Block Dist.', 'Incoming Block Dist. All', 'Sources/Targets', 'Focused Sources/Targets');
 
-      var a = d3.rgb(0, 255, 0); //红色               设置渐变颜色的起始
-      var b = d3.rgb(255, 0, 0); //绿色
+      // To Be Changed 颜色
+      var a = d3.rgb('#3288bd') //'#3288bd' //d3.rgb(0, 255, 0); //绿色               设置渐变颜色的起始
+      var b = d3.rgb('#d53e4f') //'#d53e4f' //d3.rgb(255, 0, 0); //红色
       self.compute = d3.interpolate(a, b);
       self.lineGenaretor = d3.svg.line()
         .interpolate("basis")
         .x(function (d) { return d[0] })
         .y(function (d) { return d[1] });
 
-      self.initGraphSettings(64, 32, 0.5)
+      self.initGraphSettings(32, 32, 0.65)
 
       self.filterData([], max_nodes, nodes, links, dists, transfers);
       self.drawProcLinks();
       self.drawProcNodes();
       self.drawMaxNodes();
+      self.drawViolinPlot();
+      self.drawRoundIndex();
     },
 
     computeAlignBlockLists()
@@ -467,7 +622,34 @@ export default {
       })
     },
 
-    // computeRankingsByProcsParticles(selected_rounds, data) {},
+    computeRankingsByProcsParticleCount(selected_rounds, data) 
+    {
+      var self = this;
+
+      var procptcnts = []
+      for (var i = 0; i < self.n_nodes; i ++) procptcnts.push(0);
+      data.forEach(function (d) {
+        for (var j = 0; j < selected_rounds.length; j ++)
+          if (selected_rounds[j] == d.round) 
+            procptcnts[d.name] += d.npts;
+      })
+
+      var proc2ptcnts = []
+      for (var i = 0; i < self.n_nodes; i ++)
+        proc2ptcnts.push({"name": i, "npts": procptcnts[i]});
+
+      proc2ptcnts.sort(function (a, b) {
+        return b["npts"] - a["npts"];
+      });
+
+      proc2ptcnts.forEach(function (d, i) { 
+        if (i < self.n_limited_nodes) {
+          self.rankings[d.name] = i; 
+          self.filtered_nodes[d.name] = 1;
+          self.display_nodes_array.push(d.name);
+        }
+      })
+    },
 
     computeRankingsByProcsAvgBlockWorkload(selected_rounds, data)
     {
@@ -496,6 +678,41 @@ export default {
       });
 
       proc2avgblkwl.forEach(function (d, i) { 
+        if (i < self.n_limited_nodes) {
+          self.rankings[d.name] = i; 
+          self.filtered_nodes[d.name] = 1;
+          self.display_nodes_array.push(d.name);
+        }
+      })
+    },
+
+    computeRankingsByProcsAvgParticleWorkload(selected_rounds, data)
+    {
+      var self = this;
+
+      var procwls = [], procptcnts = []
+      for (var i = 0; i < self.n_nodes; i ++) {
+        procwls.push(0);
+        procptcnts.push(0)
+      }
+
+      data.forEach(function (d) {
+        for (var j = 0; j < selected_rounds.length; j ++)
+          if (selected_rounds[j] == d.round) {
+            procwls[d.name] += d.workload;
+            procptcnts[d.name] += d.npts;
+          }
+      })
+
+      var proc2avgptwl = []
+      for (var i = 0; i < self.n_nodes; i ++)
+        proc2avgptwl.push({"name": i, "avgptwl": procwls[i]/procptcnts[i]});
+
+      proc2avgptwl.sort(function (a, b) {
+        return b["avgptwl"] - a["avgptwl"];
+      });
+
+      proc2avgptwl.forEach(function (d, i) { 
         if (i < self.n_limited_nodes) {
           self.rankings[d.name] = i; 
           self.filtered_nodes[d.name] = 1;
@@ -541,12 +758,17 @@ export default {
         //     self.display_nodes_array.push(d.name);
         //   }
         // })
-        if (choice == 2) 
+        if (choice == 0) 
           self.computeRankingsByProcsWorkload(selected_rounds, data)
         else if (choice == 1)
           self.computeRankingsByProcsBlockCount(selected_rounds, data)
-        else 
+        else if (choice == 2)
           self.computeRankingsByProcsAvgBlockWorkload(selected_rounds, data)
+        else if (choice == 3)
+          self.computeRankingsByProcsParticleCount(selected_rounds, data)
+        else if (choice == 4)
+          self.computeRankingsByProcsAvgParticleWorkload(selected_rounds, data);
+        else alert("巴嘎!")
       }
 
       if (self.n_nodes > self.n_limited_nodes) {
@@ -554,6 +776,8 @@ export default {
         self.filtered_nodes[self.n_nodes] = 1
         self.display_nodes_array.push(self.n_nodes)
       }
+
+      self.raw_rankings = self.rankings
 
       console.log("rankings:", self.rankings);
     },
@@ -563,12 +787,14 @@ export default {
       var self = this
 
       self.clearGraphComponents();
-      self.initGraphSettings(64, 32, 0.5)
+      self.initGraphSettings(32, 32, 0.65)
 
       self.filterData([], max_nodes, nodes, links, dists, transfers);
       self.drawProcLinks();
       self.drawProcNodes();
       self.drawMaxNodes();
+      self.drawViolinPlot();
+      self.drawRoundIndex()
     },
 
     reRankGraph(max_nodes, nodes, links, dists, transfers) 
@@ -590,7 +816,9 @@ export default {
           var index = self.rounds[i]-1;
           for (var j = 0; j <= self.n_nodes; j ++) {
             d3.selectAll('.in_block_dist'+(index+1)+j).remove();
+            d3.selectAll('.in_block_dist_vline'+(index+1)+j).remove()
             d3.selectAll('.in_block_dist_rect'+(index+1)+j).remove();
+            d3.selectAll('.in_block_dist_texts'+(index+1)+j).remove()
 
             d3.selectAll('.out_block_dist'+(index+1)+j).remove();
             d3.selectAll('.out_block_dist_rect'+(index+1)+j).remove();
@@ -632,8 +860,10 @@ export default {
           self.focused_name = -1;
         }
 
-        if (self.selected_block != -1) {
-          self.computeBlockPathBlocks(self.selected_block);
+        //if (self.selected_block != -1) 
+        if (self.selected_blocks.length != 0)
+        {
+          self.computeBlockPathBlocks(self.selected_blocks);
           // for (var i = 1; i < self.max_round; i ++) {
           for (var i = 0; i < self.rounds.length-1; i ++) {
             var index = self.rounds[i];
@@ -643,13 +873,13 @@ export default {
 
               if (self.indistpath_nodes[index][dnode] == 1) {
                 if (self.indistselected_nodes[index][dnode] == 1) 
-                  self.updateBlockTransferPathRelated(index+1, dnode, self.selected_block);
+                  self.updateBlockTransferPathRelated(index+1, dnode, self.selected_blocks);
                 else {
-                  self.addInBlockDist(index+1, dnode, self.selected_block);
-                  if (self.outdistselected_nodes[index-1][dnode] == 1) { // for connecting outdist blocks and indist blocks (along the block transfer path)
+                  self.addInBlockDist(index+1, dnode, self.selected_blocks);
+                  /*if (self.outdistselected_nodes[index-1][dnode] == 1) { // for connecting outdist blocks and indist blocks (along the block transfer path)
                     self.removeOutBlockDist(index, dnode);
-                    self.addOutBlockDist(index, dnode, 0)
-                  }
+                    self.addOutBlockDist(index, dnode)
+                  }*/
                 }
               }
             }
@@ -662,8 +892,8 @@ export default {
             for (var j = 0; j < self.n_nodes; j ++) {
               if (self.indistselected_nodes[index][j] == 1) {
                 if (self.indistpath_nodes[index][j] == 1) 
-                  self.removeInBlockDist(index+1, j, self.selected_block);
-                self.addInBlockDist(index+1, j, -1);
+                  self.removeInBlockDist(index+1, j, self.selected_blocks);
+                self.addInBlockDist(index+1, j, []);
               }
             }
           }
@@ -674,13 +904,13 @@ export default {
 
             for (var j = 0; j < self.n_nodes; j ++) {
               if (self.outdistselected_nodes[index][j] == 1) {
-                self.addOutBlockDist(index+1, j, 0);
+                self.addOutBlockDist(index+1, j);
                 for(var target in self.transfer_json[parseInt(index)+1][j]) {
                   for (var bid in self.transfer_json[parseInt(index)+1][j][target]) {
                     if (self.filtered_nodes[parseInt(target)] == 1) {
                       if (self.indistpath_nodes[parseInt(index)+1][parseInt(target)] == 1 && self.indistselected_nodes[parseInt(index)+1][parseInt(target)] != 1) {
-                        self.removeInBlockDist(parseInt(index)+2, parseInt(target), self.selected_block);
-                        self.addInBlockDist(parseInt(index)+2, parseInt(target), self.selected_block);
+                        self.removeInBlockDist(parseInt(index)+2, parseInt(target), self.selected_blocks);
+                        self.addInBlockDist(parseInt(index)+2, parseInt(target), self.selected_blocks);
                       }
                     }
                   }
@@ -695,7 +925,7 @@ export default {
 
             for (var j = 0; j < self.n_nodes; j ++) {
               if (self.indistselected_nodes[index][j] == 1) {
-                self.addInBlockDist(index+1, j, -1)
+                self.addInBlockDist(index+1, j, [])
               }
             }
           }
@@ -706,7 +936,7 @@ export default {
 
             for (var j = 0; j < self.n_nodes; j ++) {
               if (self.outdistselected_nodes[index][j] == 1) {
-                self.addOutBlockDist(index+1, j, 0)
+                self.addOutBlockDist(index+1, j)
               }
             }
           }
@@ -720,15 +950,163 @@ export default {
       } 
     },
 
-
-    reOrderGraph(blockid) // TODO
+    reOrderGraph() // TODO
     {
-      var self = this;
+      var self = this
 
-      // Compute rankings TODO
-      // self.computeRankings(rounds, nodes);
+      if (self.selected_blocks.length > 0) {
+        var temp_dists = self.distances;
+        self.distances = {}
+        for (var i = 0; i < self.display_nodes_array.length; i ++) { // 注意check有没有把super node算进去
+          var first = self.display_nodes_array[i];
+          for (var j = i+1; j < self.display_nodes_array.length; j ++) {
+            var second = self.display_nodes_array[j];
 
-      self.updateGraph()
+            if (temp_dists[second] && temp_dists[second][first]) {
+              if (!self.distances[first]) self.distances[first] = {}
+              if (!self.distances[first][second]) self.distances[first][second] = 0
+
+              if (temp_dists[first] && temp_dists[first][second]) {
+                self.distances[first][second] += (temp_dists[first][second] + temp_dists[second][first])
+              } else {
+                self.distances[first][second] += temp_dists[second][first]
+              }
+            } else {
+              if (temp_dists[first] && temp_dists[first][second]) {
+                if (!self.distances[first]) self.distances[first] = {}
+                if (!self.distances[first][second]) self.distances[first][second] = 0
+
+                self.distances[first][second] += temp_dists[first][second]
+              }
+            }
+          }   
+        }
+
+console.log("distances", self.distances) // 还没有算边的条数
+
+        // TODO
+        var distlists = [];
+        for (var i in self.distances) {
+          for (var j in self.distances[i]) {
+            distlists.push({
+              "a": parseInt(i),
+              "b": parseInt(j),
+              "weight": parseInt(self.distances[i][j])
+            })
+          }
+        }
+
+        distlists.sort(function (a, b) { return b["weight"] - a["weight"]; });
+
+console.log("distlists", distlists)
+
+        var resultlists = []
+        var cts = {}
+        for (var i = 0; i < distlists.length; i ++) {
+
+          var count = 0
+          for (var j = 0; j < resultlists.length; j ++) 
+          {
+            if ((resultlists[j].a == distlists[i].a || resultlists[j].b == distlists[i].b) || (resultlists[j].a == distlists[i].b || resultlists[j].b == distlists[i].a)) 
+            {
+              count ++;
+            }
+          }
+
+          if (count <= 1) {
+            resultlists.push({
+              "a": distlists[i].a,
+              "b": distlists[i].b,
+              "weight": distlists[i].weight
+            })
+
+            if (!cts[distlists[i].a]) cts[distlists[i].a] = 0
+            cts[distlists[i].a] += 1
+
+            if (!cts[distlists[i].b]) cts[distlists[i].b] = 0
+            cts[distlists[i].b] += 1 
+          }
+        }
+
+console.log("resultlists", resultlists)
+
+        var ctones = []
+        for (var i in cts) {
+          if (cts[i] == 1) ctones.push(i)
+        }
+
+console.log("ctones", ctones)
+
+        var newlists = []
+        while (ctones.length > 0) {
+          
+          var target = ctones[0];
+          newlists.push(parseInt(target))
+
+          ctones.splice(ctones.indexOf(target), 1)
+
+          var ffflag = true;
+          while (resultlists.length > 0 && ffflag) 
+          {
+            var i = 0 
+            var flag = true
+            while (i < resultlists.length && flag) 
+            {
+              if (resultlists[i].a == target) {
+                newlists.push(resultlists[i].b)
+ 
+                target = resultlists[i].b
+                flag = false
+
+                resultlists.splice(i, 1)
+              }
+              else if (resultlists[i].b == target) {
+                newlists.push(resultlists[i].a)
+             
+                target = resultlists[i].a
+                flag = false
+
+                resultlists.splice(i, 1)
+              }
+
+              i++
+            }
+
+
+            if (flag) ffflag = false;
+          }
+
+          ctones.splice(ctones.indexOf(target), 1)
+        }
+
+console.log("newlists", newlists.length, newlists)
+
+        self.raw_rankings = self.rankings
+        self.rankings = {}
+        var n = 0
+        for (var i = 0; i < newlists.length; i ++) {
+          var name = parseInt(newlists[i])
+          self.rankings[name] = n
+
+          n ++
+        }
+
+        for (var i = 0; i < self.n_limited_nodes; i ++) {
+          var name = self.display_nodes_array[i]
+          if (self.rankings[name] == undefined) {
+            self.rankings[name] = n
+            n++
+          }
+        }
+
+        if (self.n_nodes > self.n_limited_nodes) {
+          self.rankings[self.n_nodes] = self.n_limited_nodes
+        }
+
+console.log("reorder rankings: ", self.rankings)
+
+        self.updateGraph()
+      }
     },
 
 
@@ -748,8 +1126,8 @@ export default {
 
         for (var j = 0; j < self.n_nodes; j ++) {
           if (self.indistpath_nodes[index][j] == 1 || self.indistselected_nodes[index][j] == 1) {
-            if (self.indistselected_nodes[index][j] == 1) self.removeInBlockDist(index+1, j, -1)
-            else self.removeInBlockDist(index+1, j, self.selected_block)
+            if (self.indistselected_nodes[index][j] == 1) self.removeInBlockDist(index+1, j, [])
+            else self.removeInBlockDist(index+1, j, self.selected_blocks)
           }
         }
       }
@@ -771,8 +1149,8 @@ export default {
 
         for (var j = 0; j < self.n_nodes; j ++) {
           if (self.indistpath_nodes[index][j] == 1 || self.indistselected_nodes[index][j] == 1) {
-            if (self.indistselected_nodes[index][j] == 1) self.addInBlockDist(index+1, j, -1)
-            else self.addInBlockDist(index+1, j, self.selected_block)
+            if (self.indistselected_nodes[index][j] == 1) self.addInBlockDist(index+1, j, [])
+            else self.addInBlockDist(index+1, j, self.selected_blocks)
           }
         }
       }
@@ -783,11 +1161,11 @@ export default {
 
         for (var j = 0; j < self.n_nodes; j ++) {
           if (self.outdistselected_nodes[index][j] == 1) {
-            self.addOutBlockDist(index+1, j, 0)
+            self.addOutBlockDist(index+1, j)
 
             if (self.indistpath_nodes[index+1][j] == 1 && self.indistselected_nodes[index+1][j] != 1) {
-              self.removeInBlockDist(index+2, j, self.selected_block);
-              self.addInBlockDist(index+2, j, self.selected_block);
+              self.removeInBlockDist(index+2, j, self.selected_blocks);
+              self.addInBlockDist(index+2, j, self.selected_blocks);
             }
           }
         }
@@ -815,9 +1193,14 @@ export default {
       })
 
       // nodes
+      self.node_wls = {}
       self.node_json = {}
       nodes.forEach(function (d, i) {
         if (d.round >= self.rounds[0] && d.round <= self.rounds[self.rounds.length-1]) {
+          // node_wls for summary glyph
+          if (!self.node_wls[d.round]) self.node_wls[d.round] = []
+          self.node_wls[d.round].push(d.workload);
+
           if (!self.node_json[d.round]) self.node_json[d.round] = {}
 
           var name = self.filtered_nodes[d.name] == 1 ? d.name : self.n_nodes // d.name can not be n_nodes
@@ -905,6 +1288,8 @@ export default {
       self.max_nfdpts = 0
       self.min_nufdpts = 1000000000
       self.max_nufdpts = 0
+      self.min_nblocks = 1000000000
+      self.max_nblocks = 0
       self.max_wl = []
       self.min_wl = []
       for (var r in self.node_json) {
@@ -926,11 +1311,14 @@ export default {
 
             self.min_nufdpts = Math.min(self.min_nufdpts, u.npts - u.nfdpts)
             self.max_nufdpts = Math.max(self.max_nufdpts, u.npts - u.nfdpts)
+
+            self.min_nblocks = Math.min(self.min_nblocks, u.count)
+            self.max_nblocks = Math.max(self.max_nblocks, u.count)
           }
         }
       }
 
-      console.log(self.min_npts, self.max_npts, self.min_nfdpts, self.max_nfdpts, self.min_nufdpts, self.max_nufdpts)
+      console.log(self.min_npts, self.max_npts, self.min_nfdpts, self.max_nfdpts, self.min_nufdpts, self.max_nufdpts, self.min_nblocks, self.max_nblocks)
 
       self.min_value = 1000000000
       self.max_value = 0
@@ -953,6 +1341,135 @@ export default {
       console.log(self.min_value, self.max_value, self.min_link_count, self.max_link_count)
     }, 
 
+    drawViolinPlot()
+    {
+      var self = this;
+
+      for (var i = 0; i < self.num_rounds; i ++) 
+      {
+        var round = self.rounds[i];
+        self.node_wls[round] = self.node_wls[round].sort(d3.ascending) // 升序
+      // console.log(self.node_wls[round])
+        var max_node_wl = d3.max(self.node_wls[round])
+
+        var data = d3.layout.histogram()
+                    .bins(self.resolution)
+                    .frequency(0)
+                    (self.node_wls[round]);
+
+        var roundHeight = self.graphHeight/(self.num_rounds - 1);
+        var wlG = self.glyphG.append("g").attr("transform", "translate(0, " + (i * roundHeight - roundHeight/2 + roundHeight*0.15) + ")");
+
+        // violin plot
+        var violin_data = []
+        data.forEach(function (d, k) {
+          violin_data.push({"x": d.x, "y0":-1*d.y, "y1":d.y})
+        })
+
+        var min_x = d3.min(violin_data, function(d) {return d.x})
+        var max_x = d3.max(violin_data, function(d) {return d.x})
+
+        var y = d3.scale.linear()
+                 .range([roundHeight*0.7, 0])
+                 .domain([d3.min(violin_data, function(d) { return d.y0; }), d3.max(violin_data, function(d) { return d.y1; })]);
+
+        var violin_domain = [min_x, max_x]
+        var x = d3.scale.linear()
+                 .range([0, self.glyphWidth])
+                 //.domain(violin_domain)
+                 .domain([0, max_node_wl])
+
+        var area = d3.svg.area()
+            .interpolate('basis')
+            .x(function(d) { return x(d.x); })
+            .y0(function(d) { return y(d.y0); })
+            .y1(function(d) { return y(d.y1); })
+
+        var line = d3.svg.line()
+            .interpolate('basis')
+            .x(function(d) { return x(d.x); })
+            .y(function(d) { return y(d.y1); })
+
+        wlG.append("path")
+          .datum(violin_data)
+          .attr("class", "area")
+          .attr("d", area)
+          .style("fill", "#cccccc");
+
+        wlG.append("path")
+          .datum(violin_data)
+          .attr("class", "violin")
+          .attr("d", line)
+          .style("stroke", "#cccccc");
+
+        // box plot
+        var x = d3.scale.linear()
+                  .range([0, self.glyphWidth])
+                  .domain([0, max_node_wl]);
+
+        var probs=[0.05,0.25,0.5,0.75,0.95];
+        for(var j=0; j<probs.length; j++){
+          probs[j]=x(d3.quantile(self.node_wls[round], probs[j]))
+        }
+
+        wlG.append("rect")
+          .attr("class", "boxplot fill")
+          .attr("y", roundHeight*0.35 - self.node_r*0.5)
+          .attr("height", self.node_r)
+          .attr("x", probs[1])
+          .attr("width", -probs[1]+probs[3])
+          .style("fill", "black");
+
+        var iS=[0,2,4];
+        var iSclass=["","median",""];
+        var iSColor=["black", "white", "black"]
+        for(var j=0; j<iS.length; j++){
+          wlG.append("line")
+            .attr("class", "boxplot "+iSclass[j])
+            .attr("y1", roundHeight*0.35 - self.node_r*0.5)
+            .attr("y2", roundHeight*0.35 + self.node_r*0.5)
+            .attr("x1", probs[iS[j]])
+            .attr("x2", probs[iS[j]])
+            .style("fill", iSColor[j])
+            .style("stroke", iSColor[j]);
+        }
+
+        var iS=[[0,1],[3,4]];
+        for(var j=0; j<iS.length; j++){
+          wlG.append("line")
+            .attr("class", "boxplot")
+            .attr("y1", roundHeight*0.35)
+            .attr("y2", roundHeight*0.35)
+            .attr("x1", probs[iS[j][0]])
+            .attr("x2", probs[iS[j][1]])
+            .style("stroke", "black");
+        }
+
+        wlG.append("rect")
+          .attr("class", "boxplot")
+          .attr("y", roundHeight*0.35 - self.node_r*0.5)
+          .attr("height", self.node_r)
+          .attr("x", probs[1])
+          .attr("width", -probs[1]+probs[3])
+          .style("stroke", "black");
+
+        wlG.append("circle")
+          .attr("class", "boxplot mean")
+          .attr("cy", roundHeight*0.35)
+          .attr("cx", x(d3.mean(self.node_wls[round])))
+          .attr("r", self.node_r*0.2)
+          .style("fill", "white")
+          .style("stroke", 'None');
+
+        wlG.append("circle")
+          .attr("class", "boxplot mean")
+          .attr("cy", roundHeight*0.35)
+          .attr("cx", x(d3.mean(self.node_wls[round])))
+          .attr("r", self.node_r*0.1)
+          .style("fill", "black")
+          .style("stroke", 'None');
+      }
+    },
 
     drawMaxNodes()
     {
@@ -1013,7 +1530,10 @@ export default {
         .attr('id', function (d, i) { return 'node-' + i })
         .attr("r", function (d) {
           if (d.name == self.n_nodes) return self.super_node_r;
-          else return (d.npts - d.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          else {
+            return (d.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+          // return (d.npts - d.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          }
         })
         .attr("fill", function (d) {
           if (d.name == self.n_nodes) return '#666'
@@ -1034,8 +1554,9 @@ export default {
         })
         .attr("stroke", "black")
         .attr("stroke-width", function (d) {
-          if (d.name == self.n_nodes) return 0; // TODO 统一处理
-          else return (d.nfdpts - self.min_nfdpts) * self.max_node2_stroke_w / (self.max_nfdpts - self.min_nfdpts);
+          return 0
+          // if (d.name == self.n_nodes) return 0; // TODO 统一处理
+          // else return (d.nfdpts - self.min_nfdpts) * self.max_node2_stroke_w / (self.max_nfdpts - self.min_nfdpts);
         })
         .on('click', function (d, i) {
           if (d.name == self.n_nodes) alert("It is a super node!!");
@@ -1069,9 +1590,175 @@ export default {
             var focused_node = {"name": d.name, "round": d.round}; 
             d3.event.preventDefault();
             // console.log('contextmenu')
-            self.menu(d3.mouse(this)[0]+20, d3.mouse(this)[1], focused_node);
+            self.menu(d3.mouse(this)[0]+20 + self.paddingWidth, d3.mouse(this)[1] + self.paddingHeight, focused_node);
           }
         });
+
+      // draw Proc. IDs
+      var procIDtexts = [];
+      for (var i = 0; i <= self.n_nodes; i ++) {
+        if (self.rankings[i] || self.rankings[i] == 0) procIDtexts.push({
+          "name": i,
+          "rank": self.rankings[i]
+        })
+      }
+
+      var drag = d3.behavior.drag()
+            .on("drag", dragmove)
+            .on('dragend', dragend);
+      
+      function dragmove(d) {
+        var tartext = "#procidtext"+d3.select(this).attr("idtext");
+        d3.select(tartext)
+          .attr("x", d3.event.x)
+          .attr("y", d3.event.y)
+       
+       self.endx =  d3.event.x
+      }
+
+      function dragend(d) {
+        // rerank
+        var tid = parseInt(d3.select(this).attr("idtext"));
+        //console.log(d3.event.x)
+        //var endx = parseInt(d3.event.x)
+        // self.rankings[d.name] * self.graphWidth / self.n_display_nodes
+        var position = self.endx*self.n_display_nodes/self.graphWidth
+        var cpo = Math.ceil(position),
+            fpo = Math.floor(position)
+
+        var temp_rankings = self.rankings
+        self.rankings = {}
+
+        console.log("dragend", position, cpo, fpo, tid, temp_rankings[tid])
+
+        if (fpo == temp_rankings[tid]) self.rankings = temp_rankings
+
+        if (fpo < temp_rankings[tid]) {
+          for (var k in temp_rankings) {
+            if (temp_rankings[k] <= fpo) self.rankings[k] = temp_rankings[k]
+
+            if (temp_rankings[k] > fpo && temp_rankings[k] < temp_rankings[tid]) self.rankings[k] = temp_rankings[k] + 1
+
+            if (temp_rankings[k] == temp_rankings[tid]) self.rankings[k] = fpo + 1
+
+            if (temp_rankings[k] > temp_rankings[tid]) self.rankings[k] = temp_rankings[k]
+          }
+        } 
+
+        if (fpo > temp_rankings[tid]) {
+          console.log(self.rankings)
+          for (var k in temp_rankings) {
+            if (temp_rankings[k] < temp_rankings[tid])  {
+              self.rankings[k] = temp_rankings[k]
+            }
+
+            if (temp_rankings[k] == temp_rankings[tid]) {
+              self.rankings[k] = fpo
+            }
+
+            if (temp_rankings[k] > temp_rankings[tid] && temp_rankings[k] <= fpo) {
+              self.rankings[k] = temp_rankings[k] - 1
+            }
+
+            if (temp_rankings[k] > fpo) {
+              self.rankings[k] = temp_rankings[k]
+            }
+          }
+        }
+
+        self.raw_rankings = self.rankings
+
+        console.log("new rankings: ", self.rankings)
+        
+        self.updateGraph();
+      }
+
+      self.textG.selectAll(".procIDtexts").remove(); 
+      self.textG.selectAll(".made").remove(); // ma de
+
+      self.textG.selectAll(".made").data(procIDtexts).enter().append("rect")
+        .attr("class", "made")
+        .attr("idtext", function(d) {return d.name})
+        .attr('x', function (d) {
+          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes - 10;
+        })
+        .attr('y', 0 - 15)
+        .attr('width', 20)
+        .attr('height', 20)
+        .attr('stroke', 'white')
+        .attr('fill', 'white')
+        .call(drag)
+
+      self.textG.selectAll(".procIDtexts").data(procIDtexts).enter().append("text")
+        .text(function (d) { 
+          if (d.name < self.n_nodes) return d.name; 
+          else return "-"
+        })
+        .attr("class", "procIDtexts")
+        .attr("id", function(d) {return "procidtext"+d.name})
+        .attr('x', function (d) {
+          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+        })
+        .attr('y', 0)
+        .attr('text-anchor', 'middle')
+        .style('font-size', self.node_text_size)
+        //.call(drag)
+    
+    },
+
+    drawRoundIndex()
+    {
+      var self = this;
+
+      var data = self.rounds
+      self.roundG.selectAll(".roundindex") 
+        .data(data)
+        .enter().append("rect")
+        .attr("class", function(d,i) {
+          return "roundindex"+d
+        })
+        .attr("x", 5)
+        .attr("y", function (d, i) { 
+          return i*self.graphHeight/(self.num_rounds-1) - self.node_r/2;
+        })
+        .attr("width", 20)
+        .attr("height", self.node_r)
+        .attr("fill", "white")
+        .attr("stroke-width", 1)
+        .attr("stroke", "black")
+        .on('mouseover', function(d){
+          d3.select(this).style('cursor', 'pointer')
+        })
+        .on('click', function(d,i){
+          if(self.selected_rounds.indexOf(d)!=-1) {
+            self.selected_rounds.splice(self.selected_rounds.indexOf(d),1) // remove this round
+
+            d3.select(".roundindex"+d).attr("fill", "white")
+          } else {
+            self.selected_rounds.push(d);
+
+            d3.select(".roundindex"+d).attr("fill", "grey")
+          }
+
+          console.log("selected_rounds", self.selected_rounds)
+
+          self.reRankGraph(self.init_max_nodes, self.init_nodes, self.init_links, self.init_dists, self.init_transfers)
+
+        })
+
+      self.roundG.selectAll(".roundindextexts") 
+        .data(data)
+        .enter().append("text")
+        .attr("class", "roundindextexts")
+        .text(function(d, i) {
+          return d
+        })
+        .attr("x", 15)
+        .attr("y", function (d, i) { 
+          return i*self.graphHeight/(self.num_rounds-1) + self.node_r/2 - 4;
+        })
+        .attr('text-anchor', 'middle')
+        .style('font-size', self.node_text_size);
     },
 
     drawProcLinks()
@@ -1127,9 +1814,10 @@ export default {
             }
           })
           .attr("stroke", function (d) {
+            // To Be Changed
             if (line.attr.value > 0 && line.attr.count > 0) return "black" // both
-            if (line.attr.value > 0 && line.attr.count <= 0) return "green" // only particles
-            if (line.attr.value <= 0 && line.attr.count > 0) return "red" // only blocks
+            if (line.attr.value > 0 && line.attr.count <= 0) return "#3288bd" // only particles
+            if (line.attr.value <= 0 && line.attr.count > 0) return "#d53e4f" // only blocks
             if (line.attr.value <= 0 && line.attr.count <= 0) return "white"
           })
           .attr("stroke-opacity", 0.1)
@@ -1249,6 +1937,18 @@ export default {
         })
         .attr('text-anchor', 'middle')
         .style('font-size', self.node_text_size);
+
+      self.textG.selectAll(".made")
+        .attr('x', function (d) {
+          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes - 10;
+        })
+        .attr('y', 0 - 15)
+
+      self.textG.selectAll(".procIDtexts")
+        .attr('x', function (d) {
+          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+        })
+        .attr('y', 0)
     },
 
     updateProcLinks(r, name) 
@@ -1285,7 +1985,7 @@ export default {
 
               return 1;
             }
-            else return 0.02;
+            else return 0.05;
           }
           else {
             if ((round >= r && source == name) || (round < r && target == name)) {
@@ -1301,13 +2001,13 @@ export default {
 
               return 1;
             }
-            else return 0.02;
+            else return 0.05;
           }
         });
     },
 
     // functions for block dist
-    computeBlockPathBlocks(blockid)
+    computeBlockPathBlocks(blockids)
     { 
       var self = this;
 
@@ -1322,7 +2022,9 @@ export default {
 
         for (var name in self.dist_json[parseInt(index)+1]) {
           for (var bid in self.dist_json[parseInt(index)+1][name]) {
-            if (parseInt(bid) == blockid) {
+            //if (parseInt(bid) == blockid) 
+            if (blockids.indexOf(parseInt(bid))!=-1)
+            {
               self.nodes_transfer[index][parseInt(name)] = 1;
               self.indistpath_nodes[index][parseInt(name)] = 1;
             }
@@ -1334,6 +2036,7 @@ export default {
     updateInBlockDist(round, name, blockIdList) 
     {
       var self = this;
+      d3.selectAll('.in_block_dist_vline'+round+name).remove()
       d3.selectAll('.in_block_dist'+round+name).remove();
 
       var x1, y1
@@ -1355,7 +2058,10 @@ export default {
 
         if (parseInt(jname) == name) {
           if (name == self.n_nodes) pnode_r = self.super_node_r;
-          else pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          else {
+            pnode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks +1) + self.min_node2_r;
+            // pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          }
         }
       }
 
@@ -1374,7 +2080,7 @@ export default {
       self.indist_link.append('path') // line from block rect. to self node
         .datum([p1, p2, p3, p4])
         .attr("d", self.lineGenaretor)
-        .attr("class", 'in_block_dist'+round+name) // "block-path"+round+progress_id+"block")
+        .attr("class", 'in_block_dist_vline'+round+name) // "block-path"+round+progress_id+"block")
         .attr("stroke", 'black')// TODO
         .attr("stroke-opacity", 1)
         .attr("stroke-width", 1)
@@ -1424,7 +2130,7 @@ export default {
                 .attr('y2', self.graphHeight)
                 .attr('fill', 'none')
                 .attr('stroke', 'light gray')
-                .attr('stroke-width', 0.25)
+                .attr('stroke-width', 0.5)
                 .style("stroke-dasharray","5,5")
             } 
             
@@ -1432,13 +2138,27 @@ export default {
           })
           .on("mouseout", function (u) { 
             d3.select(this).attr("stroke-width", function (s) {
-              if (s.blockid == self.selected_block) return 1;
+              //if (s.blockid == self.selected_block) 
+              if (self.selected_blocks.indexOf(s.blockid) != -1)
+                return 1;
               else return 0.5;
             })
 
             self.graphG.select(".block_align_line").remove()
 
             self.blockRectMouseOut(u.blockid);
+          })
+
+      self.graphG.selectAll(".in_block_dist_texts"+round+name) // block rects.
+          .attr('x', function (u,i) {
+            if (self.is_align_blocks) {
+              return x1 + self.max_block_rect_w*self.block_align_lists[u.blockid] + self.max_block_rect_w/2
+            } else {
+              return x1 + self.max_block_rect_w*i + self.max_block_rect_w/2
+            }
+          })
+          .attr('y', function (d,i) {
+            return y1 - self.max_block_rect_h/2
           })
 
       d3.select('.in_block_dist_rect_outline'+round+name).remove();
@@ -1464,7 +2184,10 @@ export default {
 
             if (parseInt(jname) == u.source) {
               if (parseInt(jname) == self.n_nodes) snode_r = self.super_node_r;
-              else snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+              else {
+                snode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+                // snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+              }
             }
           }
   
@@ -1482,26 +2205,36 @@ export default {
             .attr("d", self.lineGenaretor)
             .attr("class", 'in_block_dist'+round+name) //"block-path"+round+progress_id+" block"+u)
             .attr("id", u.blockid) // "line-block-"+lineIndex)
+            .attr("source", u.source)
+            .attr("target", u.target)
             .attr('isLocal', u.isLocal)
             .attr("fill", "none")
             .attr("stroke", function () {
-              if (u.blockid == self.selected_block) {
-                if (u.isLocal == 1) return 'red'
-                else return 'green'
+              //if (u.blockid == self.selected_block) 
+              // To Be Changed 颜色
+              if (self.selected_blocks.indexOf(u.blockid) != -1)
+              {
+                /*if (u.isLocal == 1) return 'red'
+                else return 'green'*/
+                return 'grey'
               } else return 'black'
             })// TODO
             .attr("stroke-opacity", function () {
-              if (u.blockid == self.selected_block) return 1
+              //if (u.blockid == self.selected_block) 
+              if (self.selected_blocks.indexOf(u.blockid) != -1)
+                return 1
               else return 0.3;
             })
             .attr("stroke-width", function () {
-              if (u.blockid == self.selected_block) return 1.5
+              //if (u.blockid == self.selected_block) 
+              if (self.selected_blocks.indexOf(u.blockid) != -1)
+                return 1.5
               else return 1;
             })
         })
     },
 
-    addInBlockDist(round, name, blockid) 
+    addInBlockDist(round, name, blockids) 
     {
       var self = this;
 
@@ -1515,12 +2248,20 @@ export default {
           for (var bid in self.transfer_json[round-1][jsource][jtarget]) {
             var u = self.transfer_json[round-1][jsource][jtarget][bid]
 
-            if (parseInt(jtarget) == name && (blockid >= 0 ? parseInt(bid) == blockid : true)) 
+            if (parseInt(jtarget) == name && (blockids.length > 0 ? blockids.indexOf(parseInt(bid)) != -1 : true)) 
             {
               blockIdList.push({"source": parseInt(jsource), "target": parseInt(jtarget), "blockid": parseInt(bid), "isLocal": u.isLocal})
               block_pos[parseInt(bid)] = []
 
               source = parseInt(jsource);
+
+              if (blockids.length > 0) // 为了算reorder graph
+              {
+                if (!self.distances[parseInt(jsource)]) self.distances[parseInt(jsource)] = {}
+                if (!self.distances[parseInt(jsource)][parseInt(jtarget)]) self.distances[parseInt(jsource)][parseInt(jtarget)] = 0
+
+                self.distances[parseInt(jsource)][parseInt(jtarget)] += Math.abs(self.rankings[parseInt(jsource)] - self.rankings[parseInt(jtarget)])
+              }
 
               if (self.indistnodes_source[round-2][parseInt(jsource)]) self.indistnodes_source[round-2][parseInt(jsource)] += 1;
               else self.indistnodes_source[round-2][parseInt(jsource)] = 1;
@@ -1529,10 +2270,10 @@ export default {
         }
       }
 
-      if (blockid < 0) { // 为了装入block_dist_array，为了align blocks
+      if (blockids.length == 0) { // 为了装入block_dist_array，为了align blocks
         var key = round + '|' + name + '|' + 1; // 1 for in and 0 for out
         self.block_dist_array[key] = blockIdList;
-        console.log("addInBlockDist", self.block_dist_array)
+        // console.log("addInBlockDist", self.block_dist_array)
       }
 
       blockIdList.sort(function (a, b) { return a["blockid"] - b["blockid"]; }); 
@@ -1550,12 +2291,15 @@ export default {
 
         if (parseInt(jname) == name) {
           if (name == self.n_nodes) pnode_r = self.super_node_r;
-          else pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          else {
+            pnode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+            // pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          }
         }
       }
 
       if (name == self.n_nodes) { // ???
-        blockIdList.forEach(function (u) {
+/*        blockIdList.forEach(function (u) {
           var snode_r;
 
           for (var jname in self.node_json[parseInt(round)-1]) {
@@ -1563,7 +2307,10 @@ export default {
 
             if (parseInt(jname) == u.source) {
               if (parseInt(jname) == self.n_nodes) snode_r = self.super_node_r
-              else snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+              else {
+                snode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks) + self.min_node2_r;
+                // snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+              }
             }
           }
 
@@ -1598,7 +2345,7 @@ export default {
               else return 1;
             })
         })
-
+*/
       } else {
         var xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes,  // node_pos[round][progress_id][0],
             yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) - pnode_r, // node_pos[round][progress_id][1],
@@ -1612,17 +2359,20 @@ export default {
         self.indist_link.append('path') // line from block rect. to self node
           .datum([p1, p2, p3, p4])
           .attr("d", self.lineGenaretor)
-          .attr("class", 'in_block_dist'+round+name) // "block-path"+round+progress_id+"block")
+          .attr("class", 'in_block_dist_vline'+round+name) // "block-path"+round+progress_id+"block")
           .attr("stroke", 'black')// TODO
           .attr("stroke-opacity", 1)
           .attr("stroke-width", 1)
 
         var max_his_workload = 0, min_his_workload = 1000000000;
 
+        var total_workload = 0;
         for (var bid in self.dist_json[round][name]) {
           var u = self.dist_json[round][name][bid]
           max_his_workload = Math.max(max_his_workload, u.workload);
           min_his_workload = Math.min(min_his_workload, u.workload);
+
+          total_workload += u.workload;
         }
 
         //console.log("max_min_his_workload", max_his_workload, min_his_workload)
@@ -1654,7 +2404,9 @@ export default {
             return self.compute(linear(workload));
           })
           .attr("stroke-width", function (u) {
-            if (u.blockid == self.selected_block) return 1
+            //if (u.blockid == self.selected_block) 
+            if (self.selected_blocks.indexOf(u.blockid) != -1)
+              return 1
             else return 0.5
           })
           .attr("stroke", "black")
@@ -1662,7 +2414,10 @@ export default {
           .on('click', function (u, i) {
             self.updateBlockTransferPath(u.blockid) 
 
-            if (self.isNoneNodesHighlighted()) self.recoveryProcNodesLinks();       
+            if (self.isNoneNodesHighlighted()) self.recoveryProcNodesLinks();   
+
+            var sedata = [round, name, u.blockid];
+            self.setRoundProcBlock(sedata)    
           })
           .on('mouseover', function (u) {
             d3.select(this).attr("stroke-width", 1);   
@@ -1671,7 +2426,9 @@ export default {
           })
           .on("mouseout", function (u) { 
             d3.select(this).attr("stroke-width", function (s) {
-              if (s.blockid == self.selected_block) return 1;
+              //if (s.blockid == self.selected_block) 
+              if (self.selected_blocks.indexOf(s.blockid) != -1)
+                return 1;
               else return 0.5;
             })
 
@@ -1685,13 +2442,29 @@ export default {
             }
 
             var coords = self.bid2coords(u.blockid);
-            var texts = u.blockid + ": [" + coords[0] + "," + coords[1] + "," + coords[2] + "], " + workload;
+            var texts = u.blockid + ": [" + coords[0] + "," + coords[1] + "," + coords[2] + "], " + workload + ", " + (workload/total_workload * 100).toFixed(2) + "%";;
             
             return texts;
             //return u; 
           });
 
-        if (blockid >= 0) { // for connecting outdist blocks and indist blocks (along the block transfer path) 如果有outdistselected_node就不连
+        self.graphG.selectAll(".in_block_dist_texts"+round+name) // block rects.
+          .data(blockIdList)
+          .enter().append("text")
+          .text(function(u) {
+            return u.blockid
+          })
+          .attr("class", "in_block_dist_texts"+round+name)
+          .attr('x', function (u, i) {
+            return x1 + self.max_block_rect_w*i + self.max_block_rect_w/2
+          })
+          .attr('y', function (u, i) {
+            return y1 - self.max_block_rect_h/2
+          })
+          .attr('text-anchor', 'middle')
+          .style('font-size', 9);
+
+        if (blockids.length > 0) { // for connecting outdist blocks and indist blocks (along the block transfer path) 如果有outdistselected_node就不连
           for (var i = 0; i < self.display_nodes_array.length; i ++) {
             var dnode = self.display_nodes_array[i]; // dnode 永远不会是 第n_nodes结点
             if (self.outdistselected_nodes[round-2][dnode] == 1 && dnode == source) return;
@@ -1706,7 +2479,10 @@ export default {
 
             if (parseInt(jname) == u.source) {
               if (parseInt(jname) == self.n_nodes) snode_r = self.super_node_r;
-              else snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+              else {
+                snode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+                // snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+              }
             }
           }
 
@@ -1724,40 +2500,50 @@ export default {
             .attr("d", self.lineGenaretor)
             .attr("class", 'in_block_dist'+round+name) //"block-path"+round+progress_id+" block"+u)
             .attr("id", u.blockid) // "line-block-"+lineIndex)
+            .attr("source", u.source)
+            .attr("target", u.target)
             .attr('isLocal', u.isLocal)
             .attr("fill", "none")
             .attr("stroke", function () {
-              if (u.blockid == self.selected_block) {
-                if (u.isLocal == 1) return 'red'
-                else return 'green'
+              //if (u.blockid == self.selected_block) 
+              // To Be Changed 颜色
+              if (self.selected_blocks.indexOf(u.blockid) != -1)
+              {
+                /*if (u.isLocal == 1) return 'red'
+                else return 'green'*/
+                return 'grey'
               } else return 'black'
             })// TODO
             .attr("stroke-opacity", function () {
-              if (u.blockid == self.selected_block) return 1
+              //if (u.blockid == self.selected_block) 
+              if (self.selected_blocks.indexOf(u.blockid) != -1)
+                return 1
               else return 0.3;
             })
             .attr("stroke-width", function () {
-              if (u.blockid == self.selected_block) return 1.5
+              //if (u.blockid == self.selected_block) 
+              if (self.selected_blocks.indexOf(u.blockid) != -1)
+                return 1.5
               else return 1;
             })
         })
       }
     },
 
-    removeInBlockDist(round, name, blockid)
+    removeInBlockDist(round, name, blockids)
     {
       var self = this;
 
-      if (blockid < 0) {
+      if (blockids.length == 0) {
         var key = round + '|' + name + '|' + 1;
         delete self.block_dist_array[key]
-        console.log("removeInBlockDist", self.block_dist_array)
+        // console.log("removeInBlockDist", self.block_dist_array)
       }
 
       for(var source in self.transfer_json[round-1]) {
         for (var target in self.transfer_json[round-1][source]) {
           for (var bid in self.transfer_json[round-1][source][target]) {
-            if (parseInt(target) == name && (blockid >= 0 ? parseInt(bid) == blockid : true)) {
+            if (parseInt(target) == name && (blockids.length > 0 ? blockids.indexOf(parseInt(bid)) != -1 : true)) {
               self.indistnodes_source[round-2][parseInt(source)] = Math.max(self.indistnodes_source[round-2][parseInt(source)]-1, 0);
             }
           }
@@ -1765,7 +2551,9 @@ export default {
       }
 
       d3.selectAll('.in_block_dist'+round+name).remove();
+      d3.selectAll('.in_block_dist_vline'+round+name).remove();
       d3.selectAll('.in_block_dist_rect'+round+name).remove();
+      d3.selectAll('.in_block_dist_texts'+round+name).remove()
     },
 
     updateOutBlockDist(round, name, blockIdList) // TODO do not want to use this actually
@@ -1792,7 +2580,10 @@ export default {
 
         if (parseInt(jname) == name) {
           if (name == self.n_nodes) pnode_r = self.super_node_r // cannot happen
-          else pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          else {
+            pnode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+            // pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          }
         }
       }
 
@@ -1861,7 +2652,7 @@ export default {
               .attr('y2', self.graphHeight)
               .attr('fill', 'none')
               .attr('stroke', 'light gray')
-              .attr('stroke-width', 0.25)
+              .attr('stroke-width', 0.5)
               .style("stroke-dasharray","5,5")
             } 
 
@@ -1869,7 +2660,9 @@ export default {
         })
         .on("mouseout", function (u) { 
           d3.select(this).attr("stroke-width", function (s) {
-            if (s == self.selected_block) return 1;
+            //if (s == self.selected_block) 
+            if (self.selected_blocks.indexOf(s) != -1)
+              return 1;
             else return 0.5;
           })
 
@@ -1905,7 +2698,10 @@ export default {
 
               if (parseInt(jname) == parseInt(target)) {
                 if (parseInt(jname) == self.n_nodes) snode_r = self.super_node_r;
-                else snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+                else {
+                  snode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+                  // snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+                }
               }
             }
 
@@ -1929,17 +2725,25 @@ export default {
               .attr("isLocal", u.isLocal)
               .attr("fill", "none")
               .attr("stroke", function () {
-                if (parseInt(bid) == self.selected_block) {
-                  if (u.isLocal == 1) return 'red'
-                  else return 'green'
+                //if (parseInt(bid) == self.selected_block) 
+                // To Be Changed 颜色
+                if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
+                {
+                  /*if (u.isLocal == 1) return 'red'
+                  else return 'green'*/
+                  return 'grey'
                 } else return 'black'
               })// TODO
               .attr("stroke-opacity", function () {
-                if (parseInt(bid) == self.selected_block) return 1
+                //if (parseInt(bid) == self.selected_block) 
+                if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
+                  return 1
                 else return 0.3;
               })
               .attr("stroke-width", function () {
-                if (parseInt(bid) == self.selected_block) return 1.5
+                //if (parseInt(bid) == self.selected_block) 
+                if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
+                  return 1.5
                 else return 1;
               })
             //lineIndex+=1
@@ -1948,7 +2752,7 @@ export default {
       }
     },
 
-    addOutBlockDist(round, name, flag) // add a flag only for connecting ...
+    addOutBlockDist(round, name) 
     {
       var self = this;
 
@@ -1979,7 +2783,7 @@ export default {
         var key = round + '|' + name + '|' + 0; // 1 for in and 0 for out
         self.block_dist_array[key] = blockIdList;
 
-        console.log("addOutBlockDist", self.block_dist_array)
+        // console.log("addOutBlockDist", self.block_dist_array)
       }
 
       blockIdList.sort(function (a, b) {
@@ -1999,7 +2803,10 @@ export default {
 
         if (parseInt(jname) == name) {
           if (name == self.n_nodes) pnode_r = self.super_node_r // cannot happen
-          else pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          else {
+            pnode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+            // pnode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+          }
         }
       }
 
@@ -2076,7 +2883,9 @@ export default {
           }
         })
         .attr("stroke-width", function (u) {
-          if (u == self.selected_block) return 1
+          //if (u == self.selected_block) 
+          if (self.selected_blocks.indexOf(u) != -1)
+            return 1
           else return 0.5
         })
         .attr("stroke", "black")
@@ -2085,6 +2894,9 @@ export default {
           self.updateBlockTransferPath(u);
 
           if (self.isNoneNodesHighlighted()) self.recoveryProcNodesLinks();
+
+          var sedata = [round, name, u.blockid];
+          self.setRoundProcBlock(sedata) 
         })
         .on('mouseover', function (u) {
           d3.select(this).attr("stroke-width", 1);   
@@ -2093,7 +2905,9 @@ export default {
         })
         .on("mouseout", function (u) { 
           d3.select(this).attr("stroke-width", function (s) {
-            if (s == self.selected_block) return 1;
+            //if (s == self.selected_block) 
+            if (self.selected_blocks.indexOf(s) != -1)
+              return 1;
             else return 0.5;
           })
 
@@ -2123,7 +2937,10 @@ export default {
 
               if (parseInt(jname) == parseInt(target)) {
                 if (parseInt(jname) == self.n_nodes) snode_r = self.super_node_r;
-                else snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+                else {
+                  snode_r = (s.count - self.min_nblocks) * (self.max_node2_r - self.min_node2_r) / (self.max_nblocks - self.min_nblocks+1) + self.min_node2_r;
+                  // snode_r = (s.npts - s.nfdpts - self.min_nufdpts) * (self.max_node2_r - self.min_node2_r) / (self.max_npts - self.min_nufdpts) + self.min_node2_r;
+                }
               }
             }
 
@@ -2131,10 +2948,10 @@ export default {
                 y1 = block_pos[parseInt(bid)][1],
                 x2 = self.rankings[parseInt(target)] * self.graphWidth / self.n_display_nodes, 
                 y2 = (round-self.rounds[0]+1) * self.graphHeight / (self.num_rounds - 1) - snode_r; 
-
+/*
             if (flag >= 0 && (self.indistpath_nodes[round][parseInt(target)] == 1 && self.indistselected_nodes[round][parseInt(target)] != 1 && parseInt(target) != self.n_nodes)) // for connecting outdist blocks and indist blocks (along the block transfer path) 如果有在block transfer path上的node，那么把线指向其上方的block
               y2 = y2 + snode_r - self.node_r * 1.1 - self.max_block_rect_h;
-            
+*/            
             var p1 = [x1, y1]
             var p2 = [(x2 + 3 * x1)/4, (y1 + y2)/2]
             var p3 = [(3 * x2 + x1)/4, (y1 + y2)/2]
@@ -2147,17 +2964,25 @@ export default {
               .attr("isLocal", u.isLocal)
               .attr("fill", "none")
               .attr("stroke", function () {
-                if (parseInt(bid) == self.selected_block) {
-                  if (u.isLocal == 1) return 'red'
-                  else return 'green'
+                //if (parseInt(bid) == self.selected_block) 
+                // To Be Changed 颜色
+                if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
+                {
+                  /*if (u.isLocal == 1) return 'red'
+                  else return 'green'*/
+                  return 'grey'
                 } else return 'black'
               })// TODO
               .attr("stroke-opacity", function () {
-                if (parseInt(bid) == self.selected_block) return 1
+                //if (parseInt(bid) == self.selected_block) 
+                if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
+                  return 1
                 else return 0.3;
               })
               .attr("stroke-width", function () {
-                if (parseInt(bid) == self.selected_block) return 1.5
+                //if (parseInt(bid) == self.selected_block) 
+                if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
+                  return 1.5
                 else return 1;
               })
             //lineIndex+=1
@@ -2172,7 +2997,7 @@ export default {
 
       var key = round + '|' + name + '|' + 0
       delete self.block_dist_array[key]
-      console.log("removeOutBlockDist", self.block_dist_array)
+      // console.log("removeOutBlockDist", self.block_dist_array)
 
       for(var target in self.transfer_json[round][name]) {
         for (var bid in self.transfer_json[round][name][target]) {
@@ -2185,87 +3010,79 @@ export default {
       d3.selectAll('.out_block_dist_rect'+round+name).remove();
     },
 
-    updateBlockTransferPath(blockid) 
+    addDistance(round, name, blockids) 
     {
+      var self = this;
+ 
+      if (blockids.length > 0) 
+      {
+        for(var jsource in self.transfer_json[round-1]) 
+        {
+          for (var jtarget in self.transfer_json[round-1][jsource]) 
+          {
+            for (var bid in self.transfer_json[round-1][jsource][jtarget]) 
+            {
+              if (parseInt(jtarget) == name && blockids.indexOf(parseInt(bid)) != -1) 
+              {    
+                if (!self.distances[parseInt(jsource)]) self.distances[parseInt(jsource)] = {}
+                if (!self.distances[parseInt(jsource)][parseInt(jtarget)]) self.distances[parseInt(jsource)][parseInt(jtarget)] = 0
+
+                self.distances[parseInt(jsource)][parseInt(jtarget)] += Math.abs(self.rankings[parseInt(jsource)] - self.rankings[parseInt(jtarget)])
+              }
+            }
+          }
+        }
+      }
+    },
+
+    updateBlockTransferPath(blockid) // 点击一个block rect，触发显示block transfer path
+    { 
       var self = this;
 
       self.graphG.selectAll(".nodetexts").remove();
-      if (blockid == self.selected_block) {
-        // for (var i = 1; i < self.max_round; i ++) {
-        for (var i = 0; i < self.rounds.length-1; i ++) {
-          var index = self.rounds[i];
 
-          for (var j = 0; j < self.display_nodes_array.length; j ++) {
-            var dnode = self.display_nodes_array[j];
+      // for (var i = 1; i < self.max_round; i ++) {
+      for (var i = 0; i < self.rounds.length-1; i ++) {
+        var index = self.rounds[i];
 
-            if (self.indistpath_nodes[index][dnode] == 1) {
-              if (self.indistselected_nodes[index][dnode] == 1) 
-                self.updateBlockTransferPathRelated(index+1, dnode, -1);
-              else {
-                self.removeInBlockDist(index+1, dnode, self.selected_block);
+        for (var j = 0; j < self.display_nodes_array.length; j ++) {
+          var dnode = self.display_nodes_array[j];
 
-                if (self.outdistselected_nodes[index-1][dnode] == 1) { // for connecting outdist blocks and indist blocks (along the block transfer path)
-                  self.removeOutBlockDist(index, dnode);
-                  self.addOutBlockDist(index, dnode, -1)
-                }
-              }
+          if (self.indistpath_nodes[index][dnode] == 1) {
+            if (self.indistselected_nodes[index][dnode] == 1) 
+              self.updateBlockTransferPathRelated(index+1, dnode, []);
+            else {
+              self.removeInBlockDist(index+1, dnode, self.selected_blocks);
             }
           }
-        }
-
-        self.selected_block = -1;
-        // for (var i = 0; i < self.max_round; i ++) {
-        for (var i = 0; i < self.rounds.length; i ++) {
-          var index = self.rounds[i]-1;
-
-          self.nodes_transfer[index] = {}
-          self.indistpath_nodes[index] = {};
         }
       }
+
+      if (self.selected_blocks.indexOf(blockid) != -1) {        
+        self.selected_blocks.splice(self.selected_blocks.indexOf(blockid),1)
+      }
       else {
-        // remove previous one first
-        // for (var i = 1; i < self.max_round; i ++) {
-        for (var i = 0; i < self.rounds.length-1; i ++) {
-          var index = self.rounds[i];
+        self.selected_blocks.push(blockid);
+      }
 
-          for (var j = 0; j < self.display_nodes_array.length; j ++) {
-            var dnode = self.display_nodes_array[j];
+      //console.log(self.selected_blocks)
+      self.distances = {} // 选reorder时graph上只能有block transfer path
 
-            if (self.indistpath_nodes[index][dnode] == 1) {
-              if (self.indistselected_nodes[index][dnode] == 1) 
-                self.updateBlockTransferPathRelated(index+1, dnode, -1);
-              else {
-                self.removeInBlockDist(index+1, dnode, self.selected_block);
+self.computeBlockPathBlocks(self.selected_blocks);
+      // for (var i = 1; i < self.max_round; i ++) {
+      for (var i = 0; i < self.rounds.length-1; i ++) {
+        var index = self.rounds[i];
 
-                if (self.outdistselected_nodes[index-1][dnode] == 1) { // for connecting outdist blocks and indist blocks (along the block transfer path)
-                  self.removeOutBlockDist(index, dnode);
-                  self.addOutBlockDist(index, dnode, -1)
-                }
-              }
+        for (var j = 0; j < self.display_nodes_array.length; j ++) {
+          var dnode = self.display_nodes_array[j];
+
+          if (self.indistpath_nodes[index][dnode] == 1) {
+            if (self.indistselected_nodes[index][dnode] == 1) {
+              self.addDistance(index+1, dnode, self.selected_blocks);
+              self.updateBlockTransferPathRelated(index+1, dnode, self.selected_blocks);
             }
-          }
-        }
-
-        self.selected_block = blockid;
-        self.computeBlockPathBlocks(self.selected_block);
-
-        // for (var i = 1; i < self.max_round; i ++) {
-        for (var i = 0; i < self.rounds.length-1; i ++) {
-          var index = self.rounds[i];
-
-          for (var j = 0; j < self.display_nodes_array.length; j ++) {
-            var dnode = self.display_nodes_array[j];
-
-            if (self.indistpath_nodes[index][dnode] == 1) {
-              if (self.indistselected_nodes[index][dnode] == 1) 
-                self.updateBlockTransferPathRelated(index+1, dnode, self.selected_block);
-              else {
-                self.addInBlockDist(index+1, dnode, self.selected_block);
-                if (self.outdistselected_nodes[index-1][dnode] == 1) { // for connecting outdist blocks and indist blocks (along the block transfer path)
-                  self.removeOutBlockDist(index, dnode);
-                  self.addOutBlockDist(index, dnode, 0)
-                }
-              }
+            else {
+              self.addInBlockDist(index+1, dnode, self.selected_blocks);
             }
           }
         }
@@ -2274,49 +3091,65 @@ export default {
       self.updateProcNodes();
     },
 
-    updateBlockTransferPathRelated(round, name, blockid)
+    updateBlockTransferPathRelated(round, name, blockids)
     {
       d3.selectAll('.out_block_dist'+round+name)
         .attr("stroke", function () {
-          if (d3.select(this).attr('id') == blockid) {
+          //if (d3.select(this).attr('id') == blockid) 
+          if (blockids.indexOf(d3.select(this).attr('id')) != -1)
+          {
             if (d3.select(this).attr('isLocal') == 1) return "red";
             else return 'green'
           } else return "black"
         })
         .attr("stroke-width", function () {
-          if (d3.select(this).attr('id') == blockid) return 1.5;
+          //if (d3.select(this).attr('id') == blockid) 
+          if (blockids.indexOf(d3.select(this).attr('id')) != -1)
+            return 1.5;
           else return 1;
         })
         .attr("stroke-opacity", function () {
-          if (d3.select(this).attr('id') == blockid) return 1;
+          //if (d3.select(this).attr('id') == blockid) 
+          if (blockids.indexOf(d3.select(this).attr('id')) != -1)
+            return 1
           else return 0.3;
         })
 
       d3.selectAll('.in_block_dist'+round+name)
         .attr("stroke", function () {
-          if (d3.select(this).attr('id') == blockid) {
+          //if (d3.select(this).attr('id') == blockid) 
+          if (blockids.indexOf(d3.select(this).attr('id')) != -1)
+          {
             if (d3.select(this).attr('isLocal') == 1) return "red";
             else return 'green'
           } else return "black"
         })
         .attr("stroke-width", function () {
-          if (d3.select(this).attr('id') == blockid) return 1.5;
+          //if (d3.select(this).attr('id') == blockid) 
+          if (blockids.indexOf(d3.select(this).attr('id')) != -1)
+            return 1.5;
           else return 1;
         })
         .attr("stroke-opacity", function () {
-          if (d3.select(this).attr('id') == blockid) return 1;
+          //if (d3.select(this).attr('id') == blockid) 
+          if (blockids.indexOf(d3.select(this).attr('id')) != -1)
+            return 1;
           else return 0.3;
         })
 
       d3.selectAll('.out_block_dist_rect'+round+name)
         .attr("stroke-width", function (u){
-          if (u == blockid) return 1;
+          //if (u == blockid) 
+          if (blockids.indexOf(u) != -1)
+            return 1;
           else return 0.5;
         })
 
       d3.selectAll('.in_block_dist_rect'+round+name)
         .attr("stroke-width", function (u){
-          if (u.blockid == blockid) return 1;
+          //if (u.blockid == blockid) 
+          if (blockids.indexOf(u) != -1)
+            return 1;
           else return 0.5;
         })
     },
@@ -2334,33 +3167,47 @@ export default {
 
           d3.selectAll(".out_block_dist"+(index+1)+dnode)
             .attr("stroke", function () {
-              if (d3.select(this).attr('id') == self.selected_block) {
-                if (d3.select(this).attr('isLocal') == 1) return "red";
-                else return 'green'
+              //if (d3.select(this).attr('id') == self.selected_block) 
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+              {
+                // if (d3.select(this).attr('isLocal') == 1) return "red";
+                // else return 'green'
+                return "grey"
               } else return "black"
             })
             .attr("stroke-width", function () {
-              if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) return 1.5;
+              //if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) 
+              if (d3.select(this).attr('id') == u || self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1.5;
               else return 1;
             })
             .attr("stroke-opacity", function () {
-              if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) return 1;
+              //if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) 
+              if (d3.select(this).attr('id') == u || self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1;
               else return 0.3;
             })
 
           d3.selectAll(".in_block_dist"+(index+1)+dnode)
             .attr("stroke", function () {
-              if (d3.select(this).attr('id') == self.selected_block) {
-                if (d3.select(this).attr('isLocal') == 1) return "red";
-                else return 'green'
+              //if (d3.select(this).attr('id') == self.selected_block) 
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+              {
+                // if (d3.select(this).attr('isLocal') == 1) return "red";
+                // else return 'green'
+                return 'grey'
               } else return "black"
             })
             .attr("stroke-width", function () {
-              if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) return 1.5;
+              //if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) 
+              if (d3.select(this).attr('id') == u || self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1.5;
               else return 1;
             })
             .attr("stroke-opacity", function () {
-              if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) return 1;
+              // if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) 
+              if (d3.select(this).attr('id') == u || self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1;
               else return 0.3;
             })
         }
@@ -2380,33 +3227,47 @@ export default {
 
           d3.selectAll(".out_block_dist"+(index+1)+dnode)
             .attr("stroke", function () {
-              if (d3.select(this).attr('id') == self.selected_block) {
-                if (d3.select(this).attr('isLocal') == 1) return "red";
-                else return 'green'
+              //if (d3.select(this).attr('id') == self.selected_block) 
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+              {
+                // if (d3.select(this).attr('isLocal') == 1) return "red";
+                // else return 'green'
+                return 'grey'
               } else return 'black'
             })
             .attr("stroke-width", function () {
-              if (d3.select(this).attr('id') == self.selected_block) return 1.5
+              //if (d3.select(this).attr('id') == self.selected_block)
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1.5
               else return 1;
             })
             .attr("stroke-opacity", function () {
-              if (d3.select(this).attr('id') == self.selected_block) return 1
+              //if (d3.select(this).attr('id') == self.selected_block) 
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1
               else return 0.3;
             })
 
           d3.selectAll(".in_block_dist"+(index+1)+dnode)
             .attr("stroke", function () {
-              if (d3.select(this).attr('id') == self.selected_block) {
-                if (d3.select(this).attr('isLocal') == 1) return "red";
-                else return 'green'
+              //if (d3.select(this).attr('id') == self.selected_block)
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+              {
+                // if (d3.select(this).attr('isLocal') == 1) return "red";
+                // else return 'green'
+                return 'grey'
               } else return 'black'
             })
             .attr("stroke-width", function () {
-              if (d3.select(this).attr('id') == self.selected_block) return 1.5
+              //if (d3.select(this).attr('id') == self.selected_block) 
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1.5
               else return 1;
             })
             .attr("stroke-opacity", function () {
-              if (d3.select(this).attr('id') == self.selected_block) return 1
+              //if (d3.select(this).attr('id') == self.selected_block) 
+              if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
+                return 1
               else return 0.3;
             })
         }
@@ -2516,16 +3377,16 @@ export default {
 
               if (self.indistselected_nodes[round-1][name] == 1) {
                 self.indistselected_nodes[round-1][name] = 0;
-                self.removeInBlockDist(round, name, -1);
+                self.removeInBlockDist(round, name, []);
                 if (self.indistpath_nodes[round-1][name] == 1) {
-                  self.addInBlockDist(round, name, self.selected_block);
+                  self.addInBlockDist(round, name, self.selected_blocks);
                 }
               }
               else {
                 self.indistselected_nodes[round-1][name] = 1;
                 if (self.indistpath_nodes[round-1][name] == 1) 
-                  self.removeInBlockDist(round, name, self.selected_block);
-                self.addInBlockDist(round, name, -1);
+                  self.removeInBlockDist(round, name, self.selected_blocks);
+                self.addInBlockDist(round, name, []);
               }
 
               self.updateProcLinks(-1, -1);
@@ -2536,7 +3397,7 @@ export default {
               if (self.outdistselected_nodes[round-1][name] == 1) {
                 self.outdistselected_nodes[round-1][name] = 0;
                 self.removeOutBlockDist(round, name);
-                for(var target in self.transfer_json[round][name]) {
+                /*for(var target in self.transfer_json[round][name]) {
                   for (var bid in self.transfer_json[round][name][target]) {
                     if (self.filtered_nodes[parseInt(target)] == 1) {
                       if (self.indistpath_nodes[round][parseInt(target)] == 1 && self.indistselected_nodes[round][parseInt(target)] != 1) {
@@ -2544,13 +3405,13 @@ export default {
                       }
                     }
                   }
-                }
+                }*/
 
               }
               else {
                 self.outdistselected_nodes[round-1][name] = 1;
-                self.addOutBlockDist(round, name, 0);
-                for(var target in self.transfer_json[round][name]) {
+                self.addOutBlockDist(round, name);
+                /*for(var target in self.transfer_json[round][name]) {
                   for (var bid in self.transfer_json[round][name][target]) {
                     if (self.filtered_nodes[parseInt(target)] == 1) {
                       if (self.indistpath_nodes[round][parseInt(target)] == 1 && self.indistselected_nodes[round][parseInt(target)] != 1) {
@@ -2559,7 +3420,7 @@ export default {
                       }
                     }
                   }
-                }
+                }*/
               }
 
               self.updateProcLinks(-1, -1);
@@ -2570,7 +3431,7 @@ export default {
 
               for (var rd = 2; rd <= self.num_rounds; rd ++) {
                 if (self.indistselected_nodes[rd-1][name] != 1) {
-                  self.addInBlockDist(rd, name, self.selected_block);
+                  self.addInBlockDist(rd, name, self.selected_blocks);
                   self.indistselected_nodes[rd-1][name] = 1;
                 }
               }
@@ -2670,10 +3531,10 @@ export default {
       content = "<span class=\"name\">Round: </span><span class=\"address\">" + data.round + "</span><br/>";
       content += "<span class=\"name\">Proc ID: </span><span class=\"address\">" + data.name + "</span><br/>";
       content += "<span class=\"name\">NBlocks: </span><span class=\"address\">" + data.count + "</span><br/>";
-      content += "<span class=\"name\">NLocalBlocks: </span><span class=\"address\">" + data.localCount + "</span><br/>";
+      //content += "<span class=\"name\">NLocalBlocks: </span><span class=\"address\">" + data.localCount + "</span><br/>";
       content += "<span class=\"name\">Workload: </span><span class=\"address\">" + data.workload + "</span><br/>";
-      content += "<span class=\"name\">Est_Workload: </span><span class=\"address\">" + data.estWorkload + "</span><br/>";
-      content += "<span class=\"name\">Workload_Diff: </span><span class=\"address\">" + (data.workload - data.estWorkload) + "</span><br/>";
+      //content += "<span class=\"name\">Est_Workload: </span><span class=\"address\">" + data.estWorkload + "</span><br/>";
+      //content += "<span class=\"name\">Workload_Diff: </span><span class=\"address\">" + (data.workload - data.estWorkload) + "</span><br/>";
       content += "<span class=\"name\">N_Pts: </span><span class=\"address\">" + data.npts + "</span><br/>";
       content += "<span class=\"name\">N_Finished_Pts: </span><span class=\"address\">" + data.nfdpts + "</span><br/>";
       content += "<span class=\"name\">Workload_Per_Pt: </span><span class=\"address\">" + (data.workload / data.nfdpts).toFixed(3) + "</span><br/>";

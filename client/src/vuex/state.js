@@ -6,6 +6,7 @@ const state = {
   selectRankingBy: {},
   selectAlignBlocks: {},
   resetGraphView: {},
+  roundProcBlock: {},
   loading: true
 }
 export default state

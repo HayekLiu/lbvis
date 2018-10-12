@@ -1,6 +1,6 @@
 <template>
   <div id='rankContainer' ref="rankContainer">
-    <div id="rank-control">
+    <!--<div id="rank-control">
       <div id="rank-control-top">
         <span id="rankDiv">
             &nbsp&nbsp&nbsp&nbspRank by:&nbsp
@@ -19,7 +19,7 @@
       </div>
     </div>
     <div id="rank-bar">
-    </div>
+    </div>-->
   </div>
   
 </template>

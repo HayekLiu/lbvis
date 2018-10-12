@@ -139,3 +139,33 @@ line { /*x轴上刻度标*/
     text-align:right; 
     float:right;
 }
+
+.area{
+  shape-rendering: geometricPrecision;
+  fill: #ccc !important;
+}
+.boxplot{
+  shape-rendering: crispEdges;
+  fill: none;
+  stroke: black;
+  stroke-width: 0.5px;
+}
+.boxplot.fill{
+  fill: black;
+  fill-opacity: 0.3;
+  stroke: black;
+  stroke-width: 0.5px;
+}
+.boxplot.mean, .boxplot.median{
+  fill: white;
+  stroke: white;
+}
+.boxplot.mean{
+  shape-rendering: geometricPrecision;
+}
+.violin{
+  shape-rendering: geometricPrecision;
+  fill: none !important;
+  stroke: #777;
+  stroke-width: 1px;
+}
