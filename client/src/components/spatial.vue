@@ -41,6 +41,7 @@ export default {
 
       if (data[0] == this.round && data[1] == this.proc && data[2] == this.blockid) {
         this.resetRendering()
+        this.drawLineBox(this.blockid)
       } else {
         this.round = data[0]
         this.proc = data[1]
@@ -56,6 +57,10 @@ export default {
       self.round = -1;
       self.proc = -1;
       self.blockid = -1;
+
+      self.domain_sizes = [512, 512, 512]
+      self.blocklet_sizes = [64, 64, 64]
+      self.cellsizes = [8, 8, 8]
 
       self.renderer = new THREE.WebGLRenderer();
       self.renderer.setPixelRatio(window.devicePixelRatio);
@@ -81,7 +86,7 @@ export default {
     initialize() {
       var self = this
   
-      self.drawCubeBox();
+      self.drawDomainBox();
 
       self.$el.addEventListener('resize', self.onWindowResize, false);
       self.onWindowResize();
@@ -91,10 +96,6 @@ export default {
     {
       var self = this;
       
-      self.resetRendering()
-      
-      //self.drawRandomLines()
-      // TODO
       var data_header = [], data_output = []
       var dir = "static/resource/fieldlines/" + (self.round) + "/" + self.proc + "/" + self.blockid;
       //var dir = "static/resource/fieldlines/1/1/0";
@@ -102,6 +103,7 @@ export default {
         if (error) {
           alert("empty block!!");
           self.resetRendering()
+          self.drawLineBox(self.blockid)
           throw error;
         }
 
@@ -117,6 +119,7 @@ export default {
           if (error) {
             alert("empty block!!");
             self.resetRendering()
+            self.drawLineBox(self.blockid)
             throw error;
           }
 
@@ -128,16 +131,20 @@ export default {
             })
           });
     //console.log(data_output)
+        self.resetRendering()
+        self.drawLineBox(self.blockid)
+
           var n = 0
           data_header.forEach(function(d, i) {
             var points = []
             var colors = new Float32Array(d.count*3)
             var co = 0
             for (var k = n; k < n+d.count; k ++) {
-              points.push(new THREE.Vector3((data_output[k].x - 256)/512. * 20, 
-                (data_output[k].y - 256)/512. * 20, 
-                (data_output[k].z - 256)/512. * 20))
-
+              var x = (data_output[k].x - 256)/512. * 20
+              var y = (data_output[k].y - 256)/512. * 20
+              var z = (data_output[k].z - 256)/512. * 20
+              points.push(new THREE.Vector3(x, y, z))
+//console.log(x, y, z)
               //colors[co] = new THREE.Color(1.0 - 1.0 * co / d.count, 1.0 * co / d.count, 0.8)
               colors[co*3] = 1.0 - 1.0 * co / d.count
               colors[co*3+1] = 1.0 * co / d.count
@@ -189,10 +196,9 @@ export default {
       self.renderer.render(self.scene, self.camera);
     },
 
-    drawCubeBox() {
+    drawCube(starts, ends) 
+    {
       var self = this
-
-      var h = 20 * 0.5;
 
       var geometryList = [];
       var geometry0 = new THREE.BufferGeometry(),
@@ -205,28 +211,28 @@ export default {
         boxPositions3 = [];
 
       boxPositions0.push(
-        new THREE.Vector3(-h, -h, -h),
-        new THREE.Vector3(-h, h, -h),
-        new THREE.Vector3(h, h, -h),
-        new THREE.Vector3(h, -h, -h),
-        new THREE.Vector3(-h, -h, -h),
-        new THREE.Vector3(-h, -h, h),
-        new THREE.Vector3(-h, h, h),
-        new THREE.Vector3(h, h, h),
-        new THREE.Vector3(h, -h, h),
-        new THREE.Vector3(-h, -h, h)
+        new THREE.Vector3(starts[0], starts[1], starts[2]),
+        new THREE.Vector3(starts[0], ends[1], starts[2]),
+        new THREE.Vector3(ends[0], ends[1], starts[2]),
+        new THREE.Vector3(ends[0], starts[1], starts[2]),
+        new THREE.Vector3(starts[0], starts[1], starts[2]),
+        new THREE.Vector3(starts[0], starts[1], ends[2]),
+        new THREE.Vector3(starts[0], ends[1], ends[2]),
+        new THREE.Vector3(ends[0], ends[1], ends[2]),
+        new THREE.Vector3(ends[0], starts[1], ends[2]),
+        new THREE.Vector3(starts[0], starts[1], ends[2])
       );
       boxPositions1.push(
-        new THREE.Vector3(-h, h, -h),
-        new THREE.Vector3(-h, h, h)
+        new THREE.Vector3(starts[0], ends[1], starts[2]),
+        new THREE.Vector3(starts[0], ends[1], ends[2])
       );
       boxPositions2.push(
-        new THREE.Vector3(h, h, -h),
-        new THREE.Vector3(h, h, h)
+        new THREE.Vector3(ends[0], ends[1], starts[2]),
+        new THREE.Vector3(ends[0], ends[1], ends[2])
       );
       boxPositions3.push(
-        new THREE.Vector3(h, -h, -h),
-        new THREE.Vector3(h, -h, h)
+        new THREE.Vector3(ends[0], starts[1], starts[2]),
+        new THREE.Vector3(ends[0], starts[1], ends[2])
       );
 
       geometry0.setFromPoints(boxPositions0);
@@ -250,6 +256,48 @@ export default {
       }
     },
 
+    drawDomainBox() {
+      var self = this
+
+      var h = 20 * 0.5;
+      var starts = [-h, -h, -h], ends = [h, h, h]
+
+      self.drawCube(starts, ends)
+    },
+
+    drawLineBox(blockid)
+    {
+      var self = this
+
+      var id = [0, 0, 0]
+      var dx = self.cellsizes[0], dy = self.cellsizes[1], dz = self.cellsizes[2];
+      var dxdy = dx*dy;
+      id[2] = parseInt(blockid / dxdy);
+      id[1] = parseInt((blockid - id[2]*dxdy) / dx);
+      id[0] = blockid - id[1]*dx - id[2]*dxdy;
+
+      var starts = [0, 0, 0], ends = [0, 0, 0]
+
+      for (var i = 0; i < 3; i ++) {
+        starts[i] = id[i] * self.blocklet_sizes[i];
+        ends[i] = Math.min(starts[i]+self.blocklet_sizes[i], self.domain_sizes[i]-1);
+      
+        starts[i] = (starts[i]- 256)/512. * 20
+        ends[i] = (ends[i]- 256)/512. * 20
+      }
+//console.log(starts, ends)
+      self.drawCube(starts, ends)
+
+    },
+
+    resetRendering()
+    {
+      var self = this
+      
+      self.scene.remove.apply(self.scene, self.scene.children);
+      self.drawDomainBox();
+    },
+
     drawRandomLines()
     {
       var self = this
@@ -271,14 +319,6 @@ export default {
         //line.scale.set(1, 1, 1);
         self.scene.add(line)
       }
-    },
-
-    resetRendering()
-    {
-      var self = this
-      
-      self.scene.remove.apply(self.scene, self.scene.children);
-      self.drawCubeBox();
     }
   }
 }
