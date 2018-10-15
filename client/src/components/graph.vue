@@ -1968,7 +1968,8 @@ console.log("reorder rankings: ", self.rankings)
         }
       }
 
-      self.max_node.attr('stroke-opacity', function (d) {
+      self.max_node.transition().duration(500)
+        .attr('stroke-opacity', function (d) {
           if (self.highlighted_nodes[d.round-1][d.name] == 1) {
             if (self.filtered_nodes[d.name] == 1) return 0.8
             else return 0
@@ -1986,7 +1987,8 @@ console.log("reorder rankings: ", self.rankings)
             return (d.round - self.rounds[0]) * self.graphHeight / (self.num_rounds - 1);
         })
 
-      self.node.attr('opacity', function (u) {
+      self.node.transition().duration(500)
+        .attr('opacity', function (u) {
           if (self.highlighted_nodes[u.round-1][u.name] == 1) return 1;
           else return 0.25;
         })
@@ -2041,6 +2043,8 @@ console.log("reorder rankings: ", self.rankings)
       }
 
       self.proc_link.selectAll('path')
+        .transition()
+        .duration(500)
         .attr("stroke-opacity", function (q) {
           var source = d3.select(this).attr('source'),
             target = d3.select(this).attr('target'),
@@ -3391,11 +3395,11 @@ console.log("reorder rankings: ", self.rankings)
     {
       var self = this;
 
-      self.max_node.attr('stroke-opacity', function(d) {
+      self.max_node.transition().duration(500).attr('stroke-opacity', function(d) {
         if (self.filtered_nodes[d.name] == 1) return 0.8
         else return 0
       });
-      self.node.attr('opacity', 1)
+      self.node.transition().duration(500).attr('opacity', 1)
 
       self.proc_link.selectAll('path')
         .transition()
