@@ -2,20 +2,26 @@
   <div id='rankContainer' ref="rankContainer">
     <div id="rank-control">
       <div id="rank-control-top">
-        <h4>&nbsp&nbsp&nbsp&nbspRanking by:&nbsp
-        <select id="rankDiv">
-            <option value="0">Proc. Workload</option>
-            <option value="1">Block Count</option>
-            <option value="2">Avg. Block Workload</option>
-            <option value="3">Particle Count</option>
-            <option value="4">Avg. Particle Workload</option>
+        <h4>&nbsp&nbsp&nbsp&nbsp#Proc.:&nbsp
+        <select id="numberDiv">
+          <option value="0">8</option>
+          <option value="1">16</option>
+          <option value="2" selected>32</option>
+          <option value="3">64</option>
+          <option value="4">128</option>
         </select>
-        <span id="optionDiv">
-            &nbsp&nbsp&nbsp&nbspOptions:&nbsp
-            <input name="boxAlign" id="boxAlignCheck" type="checkbox">&nbspAlign Blocks&nbsp&nbsp
-            <input name="reOrder" id="reOrderCheck" type="checkbox">&nbspReorder Graph&nbsp&nbsp&nbsp
-            <input name="reset" id="resetButton" type="button" value=" Reset Graph ">
-        </span>
+          &nbsp&nbsp&nbsp&nbspRanking by:&nbsp
+        <select id="rankDiv">
+          <option value="0">Proc. Workload</option>
+          <option value="1">Block Count</option>
+          <option value="2">Avg. Block Workload</option>
+          <option value="3">Particle Count</option>
+          <option value="4">Avg. Particle Workload</option>
+        </select>
+        &nbsp&nbsp&nbsp&nbspOptions:&nbsp
+        <input name="boxAlign" id="boxAlignCheck" type="checkbox">&nbspAlign Blocks&nbsp&nbsp
+        <input name="reOrder" id="reOrderCheck" type="checkbox">&nbspReorder Graph&nbsp&nbsp&nbsp
+        <input name="reset" id="resetButton" type="button" value=" Reset Graph ">
         </h4>
       </div>
       <div id="rank-control-bottom">
@@ -63,8 +69,8 @@ export default {
     selectRound: function(data) {
       // console.log('selected rounds: ', data)
       //self.rounds = data
-      this.selected_rounds = data;
-      this.reRankGraph(this.graphData['max_nodes'], this.graphData['nodes'], this.graphData['links'], this.graphData['dists'], this.graphData['transfers'])
+      /*this.selected_rounds = data;
+      this.reRankGraph(this.graphData['max_nodes'], this.graphData['nodes'], this.graphData['links'], this.graphData['dists'], this.graphData['transfers'])*/
     },
     filterRoundIndex: function(data) {
       // console.log('selected rounds index: ', data)
@@ -151,11 +157,11 @@ export default {
       self.selected_rounds = [] // selected rounds from summary plot
 
       // self.max_round = 0 // to be changed TODO
-      self.n_nodes = 0
-      self.n_limited_nodes = 0
+      self.n_nodes = 32
+      self.n_limited_nodes = 32
       self.n_display_nodes = 0
 
-      self.n_nodes_ratio = 0
+      self.n_nodes_ratio = 0.65 // 0.15 for 64 nodes
       self.max_node2_r = 0
       self.min_node2_r = 0
       self.max_node2_stroke_w = 0
@@ -269,24 +275,23 @@ export default {
       self.indist_link = null
       self.transpath_link = null
       self.max_node = null
+
+      self.prev_proc_no_selection = "2"
     }, // TODO 全部需要重置
 
-    initGraphSettings(nNodes, nLimitedNodes, nNodesRatio) 
+    initGraphSettings() 
     {
       var self = this
 
       // self.max_round = 15 // changed to num_rounds
-      self.n_nodes = nNodes
-      self.n_limited_nodes = nLimitedNodes
       if (self.n_nodes > self.n_limited_nodes) self.n_display_nodes = self.n_limited_nodes + 1;
       else self.n_display_nodes = self.n_limited_nodes
 
-      self.n_nodes_ratio = nNodesRatio // 0.15 for 64 nodes
-      self.max_node2_r = (self.graphWidth/(self.n_display_nodes + (self.n_display_nodes-1)*self.n_nodes_ratio))/2 // 9
+      self.max_node2_r = Math.min((self.graphWidth/((self.n_display_nodes-1) + (self.n_display_nodes-1)*self.n_nodes_ratio))/2, (self.graphHeight/self.num_rounds)/2.5) // 9
       self.min_node2_r = self.max_node2_r/3 // 3, 
       self.max_node2_stroke_w = self.max_node2_r/3 // 3
       self.node_r = self.max_node2_r * 1.01 // 10
-      self.super_node_r = self.node_r * 1.2
+      self.super_node_r = self.node_r * 1.1
       self.rect_xOffset = self.node_r * 1.3
       self.rect_yOffset = self.node_r * 1.3
       self.max_block_rect_w = Math.min(self.node_r, ((self.graphHeight-self.node_r*2)/(self.num_rounds-1))/6) // 12
@@ -406,6 +411,60 @@ export default {
       self.init_dists = dists
       self.init_transfers = transfers
 
+      $("select#numberDiv").change(function() {
+        if ($(this).val() == "0") {
+          if (self.n_nodes >= 8) {
+            self.n_limited_nodes = 8; 
+            self.prev_proc_no_selection = "0"
+            self.reDrawGraph_procNo()
+          } else {
+            alert("Only " +self.n_nodes+ " processes!")
+            $("select#numberDiv").val(self.prev_proc_no_selection)
+          }
+        }
+        else if ($(this).val() == "1") {
+          if (self.n_nodes >= 16) {
+            self.n_limited_nodes = 16; 
+            self.prev_proc_no_selection = "1"
+            self.reDrawGraph_procNo()
+          } else {
+            alert("Only " +self.n_nodes+ " processes!")
+            $("select#numberDiv").val(self.prev_proc_no_selection)
+          }
+        }
+        else if ($(this).val() == "2") {
+          if (self.n_nodes >= 32) {
+            self.n_limited_nodes = 32; 
+            self.prev_proc_no_selection = "2"
+            self.reDrawGraph_procNo()
+          } else {
+            alert("Only " +self.n_nodes+ " processes!")
+            $("select#numberDiv").val(self.prev_proc_no_selection)
+          }
+        }
+        else if ($(this).val() == "3") {
+          if (self.n_nodes >= 64) {
+            self.n_limited_nodes = 64;
+            self.prev_proc_no_selection = "3" 
+            self.reDrawGraph_procNo()
+          } else {
+            alert("Only " +self.n_nodes+ " processes!")
+            $("select#numberDiv").val(self.prev_proc_no_selection)
+          }
+        }
+        else if ($(this).val() == "4") {
+          if (self.n_nodes >= 128) {
+            self.n_limited_nodes = 128; 
+            self.prev_proc_no_selection = "4"
+            self.reDrawGraph_procNo()
+          } else {
+            alert("Only " +self.n_nodes+ " processes!")
+            $("select#numberDiv").val(self.prev_proc_no_selection)
+          }
+        }
+        else alert("No other selections!")
+      })
+
       $("select#rankDiv").change(function(){
         // console.log($(this).val());
         if ($(this).val() == "0") self.choice = 0; // Proc. Workload
@@ -413,9 +472,9 @@ export default {
         else if ($(this).val() == "2") self.choice = 2; // Avg. Block Workload
         else if ($(this).val() == "3") self.choice = 3; // Particle Count
         else if ($(this).val() == "4") self.choice = 4; // Avg. Particle Workload
-        else alert("巴嘎!")
+        else alert("No other selections!")
 
-        self.reRankGraph(max_nodes, nodes, links, dists, transfers)
+        self.reRankGraph(self.init_max_nodes, self.init_nodes, self.init_links, self.init_dists, self.init_transfers)
       });
 
       $("#boxAlignCheck").click(function(evt) {
@@ -460,7 +519,7 @@ export default {
 
       var containerWidth = +$('#load-balance-container').width()
       var containerHeight = +$('#load-balance-container').height()
-      var margin = {top: 25, right: 15, bottom: 60, left: 15}
+      var margin = {top: 25, right: 70, bottom: 60, left: 20}
       var svg = d3.select("#load-balance-container")
         .append('svg')
         .attr('width', containerWidth)
@@ -520,7 +579,7 @@ export default {
         .x(function (d) { return d[0] })
         .y(function (d) { return d[1] });
 
-      self.initGraphSettings(32, 32, 0.65)
+      self.initGraphSettings()
 
       self.filterData([], max_nodes, nodes, links, dists, transfers);
       self.drawProcLinks();
@@ -768,7 +827,7 @@ export default {
           self.computeRankingsByProcsParticleCount(selected_rounds, data)
         else if (choice == 4)
           self.computeRankingsByProcsAvgParticleWorkload(selected_rounds, data);
-        else alert("巴嘎!")
+        else alert("No other selections!")
       }
 
       if (self.n_nodes > self.n_limited_nodes) {
@@ -787,9 +846,24 @@ export default {
       var self = this
 
       self.clearGraphComponents();
-      self.initGraphSettings(32, 32, 0.65)
+      self.initGraphSettings()
 
       self.filterData([], max_nodes, nodes, links, dists, transfers);
+      self.drawProcLinks();
+      self.drawProcNodes();
+      self.drawMaxNodes();
+      self.drawViolinPlot();
+      self.drawRoundIndex()
+    },
+
+    reDrawGraph_procNo()
+    {
+      var self = this
+
+      self.clearGraphComponents();
+      self.initGraphSettings()
+
+      self.filterData(self.selected_rounds, self.init_max_nodes, self.init_nodes, self.init_links, self.init_dists, self.init_transfers);
       self.drawProcLinks();
       self.drawProcNodes();
       self.drawMaxNodes();
@@ -1071,7 +1145,6 @@ console.log("ctones", ctones)
 
               i++
             }
-
 
             if (flag) ffflag = false;
           }
@@ -1492,7 +1565,7 @@ console.log("reorder rankings: ", self.rankings)
         .attr("stroke-width", 1) 
         .attr("cx", function (d) {
           if (self.filtered_nodes[d.name] == 1) 
-            return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+            return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1);
           else return 0
         })
         .attr("cy", function (d) {
@@ -1547,7 +1620,7 @@ console.log("reorder rankings: ", self.rankings)
         })
         .attr("opacity", "1.0")
         .attr("cx", function (d) {
-          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+          return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1);
         })
         .attr("cy", function (d) {
           return (d.round - self.rounds[0]) * self.graphHeight / (self.num_rounds - 1);
@@ -1622,7 +1695,7 @@ console.log("reorder rankings: ", self.rankings)
         //console.log(d3.event.x)
         //var endx = parseInt(d3.event.x)
         // self.rankings[d.name] * self.graphWidth / self.n_display_nodes
-        var position = self.endx*self.n_display_nodes/self.graphWidth
+        var position = self.endx*(self.n_display_nodes-1)/self.graphWidth
         var cpo = Math.ceil(position),
             fpo = Math.floor(position)
 
@@ -1680,7 +1753,7 @@ console.log("reorder rankings: ", self.rankings)
         .attr("class", "made")
         .attr("idtext", function(d) {return d.name})
         .attr('x', function (d) {
-          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes - 10;
+          return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1) - 10;
         })
         .attr('y', 0 - 15)
         .attr('width', 20)
@@ -1697,7 +1770,7 @@ console.log("reorder rankings: ", self.rankings)
         .attr("class", "procIDtexts")
         .attr("id", function(d) {return "procidtext"+d.name})
         .attr('x', function (d) {
-          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+          return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1);
         })
         .attr('y', 0)
         .attr('text-anchor', 'middle')
@@ -1773,9 +1846,9 @@ console.log("reorder rankings: ", self.rankings)
             var d = self.link_json[r][source][target]
 
             if (d.value > 0 || d.count > 0) {
-              var x1 = self.rankings[parseInt(source)] * self.graphWidth / self.n_display_nodes,
+              var x1 = self.rankings[parseInt(source)] * self.graphWidth / (self.n_display_nodes-1),
                 y1 = (parseInt(r) - self.rounds[0]) * self.graphHeight / (self.num_rounds - 1),
-                x2 = self.rankings[parseInt(target)] * self.graphWidth / self.n_display_nodes,
+                x2 = self.rankings[parseInt(target)] * self.graphWidth / (self.n_display_nodes-1),
                 y2 = (parseInt(r) - self.rounds[0] + 1) * self.graphHeight / (self.num_rounds - 1);
 
               var p1 = [x1, y1]
@@ -1820,7 +1893,7 @@ console.log("reorder rankings: ", self.rankings)
             if (line.attr.value <= 0 && line.attr.count > 0) return "#d53e4f" // only blocks
             if (line.attr.value <= 0 && line.attr.count <= 0) return "white"
           })
-          .attr("stroke-opacity", 0.1)
+          .attr("stroke-opacity", 0.4)
       });
     },
 
@@ -1848,7 +1921,7 @@ console.log("reorder rankings: ", self.rankings)
       self.graphG.selectAll(".rects").data(rnodes).enter().append('rect')
         .attr("class", "noderects")
         .attr("x", function (d) {
-          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes - self.rect_xOffset;
+          return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1) - self.rect_xOffset;
         })
         .attr("y", function (d) {
           return (d.round - self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) - self.rect_yOffset;
@@ -1906,7 +1979,7 @@ console.log("reorder rankings: ", self.rankings)
         })
         .attr("cx", function (d) {
           if (self.filtered_nodes[d.name] == 1) 
-            return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+            return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1);
         })
         .attr("cy", function (d) {
           if (self.filtered_nodes[d.name] == 1) 
@@ -1918,7 +1991,7 @@ console.log("reorder rankings: ", self.rankings)
           else return 0.25;
         })
         .attr("cx", function (d) { // super node 肯定排最后一位
-          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+          return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1);
         })
         .attr("cy", function (d) {
           return (d.round - self.rounds[0]) * self.graphHeight / (self.num_rounds - 1);
@@ -1930,7 +2003,7 @@ console.log("reorder rankings: ", self.rankings)
         })
         .attr("class", "nodetexts")
         .attr('x', function (u) {
-          return self.rankings[u.name] * self.graphWidth / self.n_display_nodes + self.node_text_xOffset;
+          return self.rankings[u.name] * self.graphWidth / (self.n_display_nodes-1) + self.node_text_xOffset;
         })
         .attr('y', function (u) {
           return (u.round - self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) + self.node_text_yOffset;
@@ -1939,14 +2012,18 @@ console.log("reorder rankings: ", self.rankings)
         .style('font-size', self.node_text_size);
 
       self.textG.selectAll(".made")
+        .transition()
+        .duration(500)
         .attr('x', function (d) {
-          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes - 10;
+          return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1) - 10;
         })
         .attr('y', 0 - 15)
 
       self.textG.selectAll(".procIDtexts")
+        .transition()
+        .duration(500)
         .attr('x', function (d) {
-          return self.rankings[d.name] * self.graphWidth / self.n_display_nodes;
+          return self.rankings[d.name] * self.graphWidth / (self.n_display_nodes-1);
         })
         .attr('y', 0)
     },
@@ -2046,7 +2123,7 @@ console.log("reorder rankings: ", self.rankings)
         x1 = Math.max(self.graphWidth/2 - self.max_block_rect_w*self.block_lists_len/2, -1 *self.node_r * 1.1);
         y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) - self.node_r * 1.1 - self.max_block_rect_h;
       } else {
-        x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1);  // start position of first rect.
+        x1 = Math.max(self.rankings[name] * self.graphWidth / (self.n_display_nodes-1) - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1);  // start position of first rect.
         y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) - self.node_r * 1.1 - self.max_block_rect_h; 
         x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
       }
@@ -2066,7 +2143,7 @@ console.log("reorder rankings: ", self.rankings)
       }
 
       var xx1, yy1, xx2, yy2
-      xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes  // node_pos[round][progress_id][0],
+      xx1 = self.rankings[name] * self.graphWidth / (self.n_display_nodes-1)  // node_pos[round][progress_id][0],
       yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) - pnode_r // node_pos[round][progress_id][1],
       xx2 = x1 + self.max_block_rect_w * block_len/2
       yy2 = y1 + self.max_block_rect_h + 1
@@ -2092,6 +2169,8 @@ console.log("reorder rankings: ", self.rankings)
       }
 
       self.graphG.selectAll(".in_block_dist_rect"+round+name)
+          //.transition()
+          //.duration(500)
           .attr("x", function (u, i) {
             if (self.is_align_blocks) {
               block_pos[u.blockid].push(x1 + self.max_block_rect_w*self.block_align_lists[u.blockid]+self.max_block_rect_w/2);
@@ -2113,7 +2192,7 @@ console.log("reorder rankings: ", self.rankings)
               x1 = Math.max(self.graphWidth/2 - self.max_block_rect_w*self.block_lists_len/2, -1 *self.node_r * 1.1);
             } else {
               var block_len = blockIdList.length
-              x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1);  // start position of first rect.
+              x1 = Math.max(self.rankings[name] * self.graphWidth / (self.n_display_nodes-1) - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1);  // start position of first rect.
               x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
             }
 
@@ -2150,6 +2229,8 @@ console.log("reorder rankings: ", self.rankings)
           })
 
       self.graphG.selectAll(".in_block_dist_texts"+round+name) // block rects.
+          //.transition()
+          //.duration(500)
           .attr('x', function (u,i) {
             if (self.is_align_blocks) {
               return x1 + self.max_block_rect_w*self.block_align_lists[u.blockid] + self.max_block_rect_w/2
@@ -2193,7 +2274,7 @@ console.log("reorder rankings: ", self.rankings)
   
           var x1 = block_pos[u.blockid][0],
               y1 = block_pos[u.blockid][1],
-              x2 = self.rankings[u.source] * self.graphWidth / self.n_display_nodes, // node_pos[round+1][index][0],
+              x2 = self.rankings[u.source] * self.graphWidth / (self.n_display_nodes-1), // node_pos[round+1][index][0],
               y2 = (round-self.rounds[0]-1) * self.graphHeight / (self.num_rounds - 1) + snode_r; // node_pos[round+1][index][1]
 
           var p1 = [x1, y1]
@@ -2223,7 +2304,7 @@ console.log("reorder rankings: ", self.rankings)
               //if (u.blockid == self.selected_block) 
               if (self.selected_blocks.indexOf(u.blockid) != -1)
                 return 1
-              else return 0.3;
+              else return 0.5;
             })
             .attr("stroke-width", function () {
               //if (u.blockid == self.selected_block) 
@@ -2280,7 +2361,7 @@ console.log("reorder rankings: ", self.rankings)
 
       var block_len = blockIdList.length;
 
-      var x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
+      var x1 = Math.max(self.rankings[name] * self.graphWidth / (self.n_display_nodes-1) - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
           y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) - self.node_r * 1.1 - self.max_block_rect_h; 
           x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
 
@@ -2347,7 +2428,7 @@ console.log("reorder rankings: ", self.rankings)
         })
 */
       } else {
-        var xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes,  // node_pos[round][progress_id][0],
+        var xx1 = self.rankings[name] * self.graphWidth / (self.n_display_nodes-1),  // node_pos[round][progress_id][0],
             yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) - pnode_r, // node_pos[round][progress_id][1],
             xx2 = x1 + self.max_block_rect_w * block_len/2,
             yy2 = y1 + self.max_block_rect_h
@@ -2488,7 +2569,7 @@ console.log("reorder rankings: ", self.rankings)
 
           var x1 = block_pos[u.blockid][0],
               y1 = block_pos[u.blockid][1],
-              x2 = self.rankings[u.source] * self.graphWidth / self.n_display_nodes, // node_pos[round+1][index][0],
+              x2 = self.rankings[u.source] * self.graphWidth / (self.n_display_nodes-1), // node_pos[round+1][index][0],
               y2 = (round-self.rounds[0]-1) * self.graphHeight / (self.num_rounds - 1) + snode_r; // node_pos[round+1][index][1]
 
           var p1 = [x1, y1]
@@ -2518,7 +2599,7 @@ console.log("reorder rankings: ", self.rankings)
               //if (u.blockid == self.selected_block) 
               if (self.selected_blocks.indexOf(u.blockid) != -1)
                 return 1
-              else return 0.3;
+              else return 0.5;
             })
             .attr("stroke-width", function () {
               //if (u.blockid == self.selected_block) 
@@ -2568,7 +2649,7 @@ console.log("reorder rankings: ", self.rankings)
         y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) + self.node_r * 1.1;
       } else {
         var block_len = blockIdList.length
-        x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
+        x1 = Math.max(self.rankings[name] * self.graphWidth / (self.n_display_nodes-1) - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
         y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) + self.node_r * 1.1; 
         x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
       }
@@ -2588,7 +2669,7 @@ console.log("reorder rankings: ", self.rankings)
       }
 
       var xx1, yy1, xx2, yy2
-      xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes  // node_pos[round][progress_id][0],
+      xx1 = self.rankings[name] * self.graphWidth / (self.n_display_nodes-1)  // node_pos[round][progress_id][0],
       yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) + pnode_r // node_pos[round][progress_id][1],
       xx2 = x1 + self.max_block_rect_w * block_len/2
       yy2 = y1 - 1
@@ -2614,6 +2695,8 @@ console.log("reorder rankings: ", self.rankings)
       }
       
       self.graphG.selectAll(".out_block_dist_rect"+round+name)
+        //.transition()
+        //.duration(500)
         .attr("x", function (u, i) {
           if (self.is_align_blocks) {
             block_pos[u].push(x1 + self.max_block_rect_w*self.block_align_lists[u]+self.max_block_rect_w/2);
@@ -2635,7 +2718,7 @@ console.log("reorder rankings: ", self.rankings)
             x1 = Math.max(self.graphWidth/2 - self.max_block_rect_w*self.block_lists_len/2, -1 *self.node_r * 1.1);
           } else {
             var block_len = blockIdList.length
-            x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
+            x1 = Math.max(self.rankings[name] * self.graphWidth / (self.n_display_nodes-1) - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
             x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
           }
 
@@ -2707,7 +2790,7 @@ console.log("reorder rankings: ", self.rankings)
 
             var x1 = block_pos[parseInt(bid)][0],
                 y1 = block_pos[parseInt(bid)][1],
-                x2 = self.rankings[parseInt(target)] * self.graphWidth / self.n_display_nodes, 
+                x2 = self.rankings[parseInt(target)] * self.graphWidth / (self.n_display_nodes-1), 
                 y2 = (round-self.rounds[0]+1) * self.graphHeight / (self.num_rounds - 1) - snode_r; 
 /*
             if (flag >= 0 && (self.indistpath_nodes[round][parseInt(target)] == 1 && self.indistselected_nodes[round][parseInt(target)] != 1 && parseInt(target) != self.n_nodes)) // for connecting outdist blocks and indist blocks (along the block transfer path) 如果有在block transfer path上的node，那么把线指向其上方的block
@@ -2738,7 +2821,7 @@ console.log("reorder rankings: ", self.rankings)
                 //if (parseInt(bid) == self.selected_block) 
                 if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
                   return 1
-                else return 0.3;
+                else return 0.5;
               })
               .attr("stroke-width", function () {
                 //if (parseInt(bid) == self.selected_block) 
@@ -2792,7 +2875,7 @@ console.log("reorder rankings: ", self.rankings)
 
       var block_len = blockIdList.length;
 
-      var x1 = Math.max(self.rankings[name] * self.graphWidth / self.n_display_nodes - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
+      var x1 = Math.max(self.rankings[name] * self.graphWidth / (self.n_display_nodes-1) - self.max_block_rect_w*block_len/2, -1 *self.node_r * 1.1), 
           y1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds - 1) + self.node_r * 1.1; 
           x1 = Math.min(x1, self.graphWidth - self.max_block_rect_w * (block_len+2));
 
@@ -2810,7 +2893,7 @@ console.log("reorder rankings: ", self.rankings)
         }
       }
 
-      var xx1 = self.rankings[name] * self.graphWidth / self.n_display_nodes,  // node_pos[round][progress_id][0],
+      var xx1 = self.rankings[name] * self.graphWidth / (self.n_display_nodes-1),  // node_pos[round][progress_id][0],
           yy1 = (round-self.rounds[0]) * self.graphHeight / (self.num_rounds-1) + pnode_r, // node_pos[round][progress_id][1],
           xx2 = x1 + self.max_block_rect_w * block_len/2,
           yy2 = y1
@@ -2946,7 +3029,7 @@ console.log("reorder rankings: ", self.rankings)
 
             var x1 = block_pos[parseInt(bid)][0],
                 y1 = block_pos[parseInt(bid)][1],
-                x2 = self.rankings[parseInt(target)] * self.graphWidth / self.n_display_nodes, 
+                x2 = self.rankings[parseInt(target)] * self.graphWidth / (self.n_display_nodes-1), 
                 y2 = (round-self.rounds[0]+1) * self.graphHeight / (self.num_rounds - 1) - snode_r; 
 /*
             if (flag >= 0 && (self.indistpath_nodes[round][parseInt(target)] == 1 && self.indistselected_nodes[round][parseInt(target)] != 1 && parseInt(target) != self.n_nodes)) // for connecting outdist blocks and indist blocks (along the block transfer path) 如果有在block transfer path上的node，那么把线指向其上方的block
@@ -2977,7 +3060,7 @@ console.log("reorder rankings: ", self.rankings)
                 //if (parseInt(bid) == self.selected_block) 
                 if (self.selected_blocks.indexOf(parseInt(bid)) != -1)
                   return 1
-                else return 0.3;
+                else return 0.5;
               })
               .attr("stroke-width", function () {
                 //if (parseInt(bid) == self.selected_block) 
@@ -3068,7 +3151,7 @@ console.log("reorder rankings: ", self.rankings)
       //console.log(self.selected_blocks)
       self.distances = {} // 选reorder时graph上只能有block transfer path
 
-self.computeBlockPathBlocks(self.selected_blocks);
+      self.computeBlockPathBlocks(self.selected_blocks);
       // for (var i = 1; i < self.max_round; i ++) {
       for (var i = 0; i < self.rounds.length-1; i ++) {
         var index = self.rounds[i];
@@ -3094,6 +3177,8 @@ self.computeBlockPathBlocks(self.selected_blocks);
     updateBlockTransferPathRelated(round, name, blockids)
     {
       d3.selectAll('.out_block_dist'+round+name)
+        .transition()
+        .duration(500)
         .attr("stroke", function () {
           //if (d3.select(this).attr('id') == blockid) 
           if (blockids.indexOf(d3.select(this).attr('id')) != -1)
@@ -3112,10 +3197,12 @@ self.computeBlockPathBlocks(self.selected_blocks);
           //if (d3.select(this).attr('id') == blockid) 
           if (blockids.indexOf(d3.select(this).attr('id')) != -1)
             return 1
-          else return 0.3;
+          else return 0.5;
         })
 
       d3.selectAll('.in_block_dist'+round+name)
+        .transition()
+        .duration(500)
         .attr("stroke", function () {
           //if (d3.select(this).attr('id') == blockid) 
           if (blockids.indexOf(d3.select(this).attr('id')) != -1)
@@ -3134,10 +3221,10 @@ self.computeBlockPathBlocks(self.selected_blocks);
           //if (d3.select(this).attr('id') == blockid) 
           if (blockids.indexOf(d3.select(this).attr('id')) != -1)
             return 1;
-          else return 0.3;
+          else return 0.5;
         })
 
-      d3.selectAll('.out_block_dist_rect'+round+name)
+      d3.selectAll('.out_block_dist_rect'+round+name) 
         .attr("stroke-width", function (u){
           //if (u == blockid) 
           if (blockids.indexOf(u) != -1)
@@ -3166,6 +3253,8 @@ self.computeBlockPathBlocks(self.selected_blocks);
           var dnode = self.display_nodes_array[j];
 
           d3.selectAll(".out_block_dist"+(index+1)+dnode)
+            .transition()
+            .duration(500)
             .attr("stroke", function () {
               //if (d3.select(this).attr('id') == self.selected_block) 
               if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
@@ -3185,10 +3274,12 @@ self.computeBlockPathBlocks(self.selected_blocks);
               //if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) 
               if (d3.select(this).attr('id') == u || self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
                 return 1;
-              else return 0.3;
+              else return 0.5;
             })
 
           d3.selectAll(".in_block_dist"+(index+1)+dnode)
+            .transition()
+            .duration(500)
             .attr("stroke", function () {
               //if (d3.select(this).attr('id') == self.selected_block) 
               if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
@@ -3208,7 +3299,7 @@ self.computeBlockPathBlocks(self.selected_blocks);
               // if (d3.select(this).attr('id') == u || d3.select(this).attr('id') == self.selected_block) 
               if (d3.select(this).attr('id') == u || self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
                 return 1;
-              else return 0.3;
+              else return 0.5;
             })
         }
       }
@@ -3226,6 +3317,8 @@ self.computeBlockPathBlocks(self.selected_blocks);
           var dnode = self.display_nodes_array[j];
 
           d3.selectAll(".out_block_dist"+(index+1)+dnode)
+            .transition()
+            .duration(500)
             .attr("stroke", function () {
               //if (d3.select(this).attr('id') == self.selected_block) 
               if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
@@ -3245,10 +3338,12 @@ self.computeBlockPathBlocks(self.selected_blocks);
               //if (d3.select(this).attr('id') == self.selected_block) 
               if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
                 return 1
-              else return 0.3;
+              else return 0.5;
             })
 
           d3.selectAll(".in_block_dist"+(index+1)+dnode)
+            .transition()
+            .duration(500)
             .attr("stroke", function () {
               //if (d3.select(this).attr('id') == self.selected_block)
               if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
@@ -3268,7 +3363,7 @@ self.computeBlockPathBlocks(self.selected_blocks);
               //if (d3.select(this).attr('id') == self.selected_block) 
               if (self.selected_blocks.indexOf(parseInt(d3.select(this).attr('id'))) != -1)
                 return 1
-              else return 0.3;
+              else return 0.5;
             })
         }
       }
@@ -3303,7 +3398,9 @@ self.computeBlockPathBlocks(self.selected_blocks);
       self.node.attr('opacity', 1)
 
       self.proc_link.selectAll('path')
-        .attr("stroke-opacity", 0.1)
+        .transition()
+        .duration(500)
+        .attr("stroke-opacity", 0.4)
     },
 
     // functions for context menu (rignt click events)

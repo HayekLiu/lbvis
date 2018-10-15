@@ -1,6 +1,18 @@
 <template>
-  <div>
- 
+  <div id='spatialContainer' ref="spatialContainer">
+    <div id="spatial-control">
+      <div id="spatial-control-top">
+        <h4>&nbsp&nbsp&nbsp&nbspRound:&nbsp
+           <label id="round">-</label>&nbsp&nbsp&nbsp&nbsp&nbspProc. ID:&nbsp
+           <label id="procID">-</label>&nbsp&nbsp&nbsp&nbsp&nbspBlock ID:&nbsp
+           <label id="blockID">-</label>
+        </h4>
+      </div>
+      <div id="spatial-control-bottom">
+      </div>
+    </div>
+    <div id="spatial-bar">
+    </div>
   </div>
 </template>
 <script>
@@ -41,7 +53,7 @@ export default {
 
       if (data[0] == this.round && data[1] == this.proc && data[2] == this.blockid) {
         this.resetRendering()
-        this.drawLineBox(this.blockid)
+        //this.drawLineBox(this.blockid)
       } else {
         this.round = data[0]
         this.proc = data[1]
@@ -101,9 +113,9 @@ export default {
       //var dir = "static/resource/fieldlines/1/1/0";
       d3.csv(dir + "_header.csv", function (error, header) {
         if (error) {
-          alert("empty block!!");
           self.resetRendering()
           self.drawLineBox(self.blockid)
+          alert("empty block!!");
           throw error;
         }
 
@@ -117,9 +129,9 @@ export default {
 
         d3.csv(dir + "_output.csv", function (error, output) {
           if (error) {
-            alert("empty block!!");
             self.resetRendering()
             self.drawLineBox(self.blockid)
+            alert("empty block!!");
             throw error;
           }
 
@@ -288,6 +300,13 @@ export default {
 //console.log(starts, ends)
       self.drawCube(starts, ends)
 
+      $("#round").html(self.round)
+      $("#round").css({"color": 'red'}); 
+      $("#procID").html(self.proc)
+      $("#procID").css({"color": 'red'}); 
+      $("#blockID").html(self.blockid)
+      $("#blockID").css({"color": 'red'}); 
+
     },
 
     resetRendering()
@@ -296,6 +315,10 @@ export default {
       
       self.scene.remove.apply(self.scene, self.scene.children);
       self.drawDomainBox();
+
+      $("#round").html("-")
+      $("#procID").html("-")
+      $("#blockID").html("-")
     },
 
     drawRandomLines()
